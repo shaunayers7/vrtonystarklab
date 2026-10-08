@@ -60,6 +60,54 @@
       font-size: 0.8rem;
       color: #38ef7d;
     }
+    #holo-loader {
+      position: fixed;
+      left: 16px;
+      bottom: 16px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border: 1px solid rgba(0, 240, 255, 0.45);
+      border-radius: 8px;
+      background: rgba(4, 12, 22, 0.9);
+      box-shadow: 0 0 20px rgba(0, 210, 255, 0.16);
+      font-size: 0.78rem;
+    }
+    #holo-image-input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+    }
+    #holo-loader label,
+    #restore-armor {
+      border: 1px solid rgba(0, 240, 255, 0.6);
+      border-radius: 5px;
+      padding: 8px 10px;
+      color: #8be4fc;
+      background: rgba(0, 100, 140, 0.2);
+      cursor: pointer;
+      font: inherit;
+    }
+    #holo-status {
+      color: #b7cad5;
+      max-width: 260px;
+    }
+    @media (max-width: 600px) {
+      #holo-loader {
+        left: 8px;
+        right: 8px;
+        bottom: 8px;
+        flex-wrap: wrap;
+      }
+      #holo-status {
+        max-width: none;
+      }
+    }
   </style>
 
   <script type="importmap">
@@ -79,6 +127,12 @@
     </p>
     <button class="action-btn" id="init-btn">INITIALIZE AUDIO & VR</button>
     <div id="status-pill">Awaiting authorization...</div>
+  </div>
+  <div id="holo-loader">
+    <label for="holo-image-input">LOAD HOLOGRAM IMAGE</label>
+    <input id="holo-image-input" type="file" accept="image/*" capture="environment" aria-label="Capture or load a hologram image" />
+    <button id="restore-armor" type="button">RESTORE ARMOR</button>
+    <span id="holo-status" aria-live="polite">Powered armor ready. Load an image before entering VR.</span>
   </div>
 
   <script type="module">
@@ -100,6 +154,19 @@
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.body.appendChild(renderer.domElement);
+
+    const roomLight = new THREE.HemisphereLight(0x8bdfff, 0x101522, 1.15);
+    scene.add(roomLight);
+
+    const keyLight = new THREE.DirectionalLight(0xe5f5ff, 1.6);
+    keyLight.position.set(-5, 9, 5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(1024, 1024);
+    keyLight.shadow.camera.left = -13;
+    keyLight.shadow.camera.right = 13;
+    keyLight.shadow.camera.top = 8;
+    keyLight.shadow.camera.bottom = -3;
+    scene.add(keyLight);
 
     // -------------------------------------------------------------
     // 2. PLAYER RIG & 3D AUDIO LISTENER
@@ -239,6 +306,171 @@
       scene.add(beam);
     }
 
+    const ceilingLights = [];
+    for (const x of [-8, -4, 0, 4, 8]) {
+      for (const z of [-5, 2, 7]) {
+        const fixture = new THREE.Mesh(
+          new THREE.BoxGeometry(2.5, 0.06, 0.28),
+          new THREE.MeshBasicMaterial({ color: 0x8be4fc })
+        );
+        fixture.position.set(x, 5.35, z);
+        scene.add(fixture);
+
+        if (z === 2 && x % 8 === 0) {
+          const light = new THREE.PointLight(0x63dfff, 1.8, 10);
+          light.position.set(x, 5.05, z);
+          scene.add(light);
+          ceilingLights.push(light);
+        }
+      }
+    }
+
+    for (const x of [-10.8, 10.8]) {
+      const strip = new THREE.Mesh(
+        new THREE.BoxGeometry(0.08, 4.8, 0.12),
+        new THREE.MeshBasicMaterial({ color: 0x00d2ff })
+      );
+      strip.position.set(x, 2.7, -1);
+      scene.add(strip);
+    }
+
+    // -------------------------------------------------------------
+    // 4A. PROTOTYPE VEHICLE BAYS
+    // -------------------------------------------------------------
+    const vehiclePaints = [0xb51f34, 0x263b55];
+    const vehicleLights = [];
+
+    function createPrototypeCar(paintColor, position, bayLabel) {
+      const car = new THREE.Group();
+      car.position.copy(position);
+
+      const paint = new THREE.MeshStandardMaterial({
+        color: paintColor,
+        metalness: 0.82,
+        roughness: 0.22
+      });
+      const darkGlass = new THREE.MeshPhysicalMaterial({
+        color: 0x07131e,
+        metalness: 0.55,
+        roughness: 0.12,
+        transparent: true,
+        opacity: 0.9
+      });
+      const tire = new THREE.MeshStandardMaterial({ color: 0x080b10, roughness: 0.8 });
+      const alloy = new THREE.MeshStandardMaterial({ color: 0x9eb5c7, metalness: 0.9, roughness: 0.25 });
+      const cyan = new THREE.MeshBasicMaterial({ color: 0x00eaff });
+      const red = new THREE.MeshBasicMaterial({ color: 0xff294f });
+
+      const bay = new THREE.Mesh(
+        new THREE.BoxGeometry(3.2, 0.035, 5.8),
+        new THREE.MeshStandardMaterial({ color: 0x101c2a, metalness: 0.45, roughness: 0.55 })
+      );
+      bay.position.y = 0.02;
+      bay.receiveShadow = true;
+      car.add(bay);
+
+      const bayOutline = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(3.22, 0.04, 5.82)),
+        new THREE.LineBasicMaterial({ color: 0x00aeca, transparent: true, opacity: 0.7 })
+      );
+      bayOutline.position.y = 0.04;
+      car.add(bayOutline);
+
+      const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.82, 0.42, 4.25), paint);
+      chassis.position.y = 0.58;
+      chassis.castShadow = true;
+      car.add(chassis);
+
+      const hood = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.2, 1.25), paint);
+      hood.position.set(0, 0.82, -1.25);
+      hood.castShadow = true;
+      car.add(hood);
+
+      const rearDeck = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.2, 0.8), paint);
+      rearDeck.position.set(0, 0.82, 1.55);
+      rearDeck.castShadow = true;
+      car.add(rearDeck);
+
+      const canopy = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.48, 1.62), darkGlass);
+      canopy.position.set(0, 0.98, 0.12);
+      canopy.castShadow = true;
+      car.add(canopy);
+
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.08, 0.72), paint);
+      roof.position.set(0, 1.25, 0.12);
+      car.add(roof);
+
+      for (const side of [-1, 1]) {
+        const sill = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.07, 2.8), cyan);
+        sill.position.set(side * 0.93, 0.48, 0.05);
+        car.add(sill);
+
+        for (const z of [-1.35, 1.35]) {
+          const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.22, 24), tire);
+          wheel.rotation.z = Math.PI / 2;
+          wheel.position.set(side * 0.92, 0.39, z);
+          wheel.castShadow = true;
+          car.add(wheel);
+
+          const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.235, 16), alloy);
+          hub.rotation.z = Math.PI / 2;
+          hub.position.set(side * 0.92, 0.39, z);
+          car.add(hub);
+        }
+      }
+
+      for (const x of [-0.62, 0.62]) {
+        const headlamp = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.09, 0.035), cyan);
+        headlamp.position.set(x, 0.69, -2.14);
+        car.add(headlamp);
+
+        const tailLamp = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.08, 0.035), red);
+        tailLamp.position.set(x, 0.72, 2.14);
+        car.add(tailLamp);
+      }
+
+      const bayLight = new THREE.PointLight(0x00cfff, 2.4, 5);
+      bayLight.position.set(0, 1.1, 0);
+      car.add(bayLight);
+      vehicleLights.push(bayLight);
+
+      const spot = new THREE.SpotLight(0x8be4fc, 18, 13, Math.PI / 5, 0.65, 1.4);
+      spot.position.set(position.x, 5.1, position.z - 0.5);
+      spot.target.position.copy(position).add(new THREE.Vector3(0, 0.2, 0));
+      scene.add(spot, spot.target);
+
+      const labelCanvas = document.createElement('canvas');
+      labelCanvas.width = 512;
+      labelCanvas.height = 96;
+      const labelContext = labelCanvas.getContext('2d');
+      labelContext.fillStyle = 'rgba(4, 12, 22, 0.9)';
+      labelContext.fillRect(0, 0, labelCanvas.width, labelCanvas.height);
+      labelContext.strokeStyle = '#00d2ff';
+      labelContext.strokeRect(3, 3, labelCanvas.width - 6, labelCanvas.height - 6);
+      labelContext.fillStyle = '#8be4fc';
+      labelContext.font = 'bold 34px monospace';
+      labelContext.textAlign = 'center';
+      labelContext.textBaseline = 'middle';
+      labelContext.fillText(bayLabel, labelCanvas.width / 2, labelCanvas.height / 2);
+
+      const label = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.6, 0.3),
+        new THREE.MeshBasicMaterial({
+          map: new THREE.CanvasTexture(labelCanvas),
+          transparent: true,
+          side: THREE.DoubleSide
+        })
+      );
+      label.rotation.x = -Math.PI / 2;
+      label.position.set(0, 0.055, -2.65);
+      car.add(label);
+
+      scene.add(car);
+    }
+
+    createPrototypeCar(vehiclePaints[0], new THREE.Vector3(-7.2, 0, -1.2), "MARK II // ROADSTER");
+    createPrototypeCar(vehiclePaints[1], new THREE.Vector3(7.2, 0, -1.2), "MARK III // GT");
+
     // -------------------------------------------------------------
     // 5. HALL OF ARMOR PODS
     // -------------------------------------------------------------
@@ -258,13 +490,39 @@
       uplight.position.set(0, 0.4, 0);
 
       const dummyArmor = new THREE.Group();
-      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.3), materials.brushedMetal);
+      const suitMaterial = new THREE.MeshStandardMaterial({
+        color: [0x687987, 0x454f60, 0x765443, 0x526d79][i],
+        metalness: 0.82,
+        roughness: 0.28
+      });
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.72, 0.34), suitMaterial);
       torso.position.y = 1.6;
-      const head = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.3, 0.25), materials.brushedMetal);
+      const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.28, 0.3), suitMaterial);
+      pelvis.position.y = 1.08;
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), suitMaterial);
       head.position.y = 2.15;
       const arcGlow = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), materials.cyanGlow);
       arcGlow.position.set(0, 1.7, 0.16);
-      dummyArmor.add(torso, head, arcGlow);
+      const faceplate = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.11, 0.035), materials.cyanGlow);
+      faceplate.position.set(0, 2.15, 0.15);
+      dummyArmor.add(torso, pelvis, head, arcGlow, faceplate);
+
+      for (const side of [-1, 1]) {
+        const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 10), suitMaterial);
+        shoulder.position.set(side * 0.4, 1.86, 0);
+        const upperArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.35, 4, 8), suitMaterial);
+        upperArm.position.set(side * 0.48, 1.55, 0);
+        upperArm.rotation.z = side * -0.08;
+        const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.32, 4, 8), suitMaterial);
+        forearm.position.set(side * 0.52, 1.17, 0.01);
+        const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.35, 4, 8), suitMaterial);
+        thigh.position.set(side * 0.16, 0.78, 0);
+        const shin = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.34, 4, 8), suitMaterial);
+        shin.position.set(side * 0.16, 0.36, 0);
+        const boot = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.16, 0.34), materials.brushedMetal);
+        boot.position.set(side * 0.16, 0.1, 0.06);
+        dummyArmor.add(shoulder, upperArm, forearm, thigh, shin, boot);
+      }
 
       podGroup.add(podBase, podGlass, uplight, dummyArmor);
       scene.add(podGroup);
@@ -338,7 +596,8 @@
     // 8. HOLOGRAPHIC MARK ARMOR ASSEMBLY
     // -------------------------------------------------------------
     const holoAssembly = new THREE.Group();
-    holoAssembly.position.set(0, 1.45, 0);
+    holoAssembly.position.set(0, 2.0, 0);
+    holoAssembly.scale.setScalar(0.62);
 
     let holoColorHex = 0x00f0ff;
     function makeHoloMat(opacity = 0.75, wireframe = true) {
@@ -357,22 +616,146 @@
     const helmetShellMat = makeHoloMat(0.65, true);
     const helmetShell = new THREE.Mesh(new THREE.SphereGeometry(0.22, 18, 18), helmetShellMat);
     helmetShell.scale.set(0.9, 1.15, 1.05);
+    helmetShell.position.y = 0.73;
 
     const arcCoreMat = makeHoloMat(0.9, false);
     const arcCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.08, 2), arcCoreMat);
+    arcCore.position.set(0, 0.12, 0.2);
 
     const ring1 = new THREE.Mesh(new THREE.RingGeometry(0.32, 0.33, 48), new THREE.MeshBasicMaterial({ color: holoColorHex, side: THREE.DoubleSide }));
     ring1.rotation.x = Math.PI / 2;
+    ring1.position.y = 0.12;
     const ring2 = new THREE.Mesh(new THREE.RingGeometry(0.38, 0.39, 48), new THREE.MeshBasicMaterial({ color: holoColorHex, side: THREE.DoubleSide }));
     ring2.rotation.x = Math.PI / 2.2;
+    ring2.position.y = 0.12;
 
-    holoAssembly.add(helmetShell, arcCore, ring1, ring2);
+    const armorFigure = new THREE.Group();
+    const armorSurfaceMat = makeHoloMat(0.42, false);
+    const armorDetailMat = makeHoloMat(0.85, false);
+    const armorLineMat = new THREE.LineBasicMaterial({
+      color: holoColorHex,
+      transparent: true,
+      opacity: 0.8
+    });
+    function addArmorPiece(geometry, position, material = armorSurfaceMat, scale = null) {
+      const piece = new THREE.Mesh(geometry, material);
+      piece.position.copy(position);
+      if (scale) piece.scale.copy(scale);
+      armorFigure.add(piece);
+      const outline = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), armorLineMat);
+      outline.position.copy(position);
+      if (scale) outline.scale.copy(scale);
+      armorFigure.add(outline);
+      return piece;
+    }
+
+    addArmorPiece(new THREE.BoxGeometry(0.62, 0.72, 0.34), new THREE.Vector3(0, 0.04, 0));
+    addArmorPiece(new THREE.BoxGeometry(0.66, 0.34, 0.1), new THREE.Vector3(0, 0.14, 0.2), armorDetailMat);
+    addArmorPiece(new THREE.BoxGeometry(0.48, 0.24, 0.3), new THREE.Vector3(0, -0.49, 0));
+    addArmorPiece(new THREE.CylinderGeometry(0.09, 0.11, 0.14, 16), new THREE.Vector3(0, 0.48, 0));
+    addArmorPiece(new THREE.BoxGeometry(0.23, 0.1, 0.035), new THREE.Vector3(0, 0.73, 0.2), armorDetailMat);
+
+    for (const side of [-1, 1]) {
+      addArmorPiece(
+        new THREE.SphereGeometry(0.2, 16, 12),
+        new THREE.Vector3(side * 0.43, 0.31, 0),
+        armorDetailMat,
+        new THREE.Vector3(1.1, 0.9, 0.9)
+      );
+      addArmorPiece(new THREE.CapsuleGeometry(0.11, 0.3, 4, 8), new THREE.Vector3(side * 0.57, 0.03, 0));
+      addArmorPiece(new THREE.CapsuleGeometry(0.13, 0.32, 4, 8), new THREE.Vector3(side * 0.62, -0.36, 0.01), armorDetailMat);
+      addArmorPiece(new THREE.SphereGeometry(0.12, 12, 10), new THREE.Vector3(side * 0.62, -0.65, 0.02));
+      addArmorPiece(new THREE.CapsuleGeometry(0.15, 0.36, 4, 8), new THREE.Vector3(side * 0.19, -0.78, 0));
+      addArmorPiece(new THREE.SphereGeometry(0.15, 12, 10), new THREE.Vector3(side * 0.19, -1.04, 0));
+      addArmorPiece(new THREE.CapsuleGeometry(0.12, 0.4, 4, 8), new THREE.Vector3(side * 0.19, -1.34, 0));
+      addArmorPiece(new THREE.BoxGeometry(0.32, 0.2, 0.42), new THREE.Vector3(side * 0.19, -1.62, 0.08), armorDetailMat);
+    }
+
+    const suitCoreMat = new THREE.MeshBasicMaterial({ color: holoColorHex });
+    const suitCore = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 12), suitCoreMat);
+    suitCore.position.set(0, 0.12, 0.23);
+    armorFigure.add(suitCore);
+
+    holoAssembly.add(armorFigure, helmetShell, arcCore, ring1, ring2);
     scene.add(holoAssembly);
+
+    let imageHolo = null;
+    let activeHologram = holoAssembly;
 
     // -------------------------------------------------------------
     // 9. STARKPAD TABLET + 3D POSITIONAL CHIME AUDIO
     // -------------------------------------------------------------
     const grabbables = [];
+    const holoStatus = document.getElementById('holo-status');
+    const holoImageInput = document.getElementById('holo-image-input');
+
+    function disposeImageHolo() {
+      activeHoloGrips.clear();
+      holoGesture = null;
+      if (!imageHolo) return;
+      scene.remove(imageHolo);
+      imageHolo.traverse((object) => {
+        if (!object.isMesh && !object.isLineSegments) return;
+        object.geometry.dispose();
+        const materialsToDispose = Array.isArray(object.material) ? object.material : [object.material];
+        materialsToDispose.forEach((material) => {
+          if (material.map) material.map.dispose();
+          material.dispose();
+        });
+      });
+      imageHolo = null;
+    }
+
+    holoImageInput.addEventListener('change', () => {
+      const file = holoImageInput.files?.[0];
+      if (!file) return;
+
+      const objectUrl = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        disposeImageHolo();
+
+        const texture = new THREE.Texture(image);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.needsUpdate = true;
+        const fitScale = Math.min(1.25 / image.width, 1.3 / image.height);
+        const width = image.width * fitScale;
+        const height = image.height * fitScale;
+        const imageGroup = new THREE.Group();
+        imageGroup.position.set(0, 1.85, 0);
+
+        const frame = new THREE.LineSegments(
+          new THREE.EdgesGeometry(new THREE.BoxGeometry(width + 0.08, height + 0.08, 0.015)),
+          new THREE.LineBasicMaterial({ color: 0x00eaff })
+        );
+        frame.position.z = -0.012;
+        imageGroup.add(frame);
+
+        const plane = new THREE.Mesh(
+          new THREE.PlaneGeometry(width, height),
+          new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide })
+        );
+        imageGroup.add(plane);
+        imageHolo = imageGroup;
+        scene.add(imageHolo);
+        holoAssembly.visible = false;
+        activeHologram = imageHolo;
+        holoStatus.textContent = `Loaded ${file.name}. Squeeze near the hologram to move it; use both hands to resize and rotate.`;
+      };
+      image.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        holoStatus.textContent = `Could not load ${file.name}. Choose a supported image file and try again.`;
+      };
+      image.src = objectUrl;
+    });
+
+    document.getElementById('restore-armor').addEventListener('click', () => {
+      disposeImageHolo();
+      holoAssembly.visible = true;
+      activeHologram = holoAssembly;
+      holoStatus.textContent = 'Powered armor restored. Squeeze near it to move; use both hands to resize and rotate.';
+    });
 
     const padGroup = new THREE.Group();
     padGroup.position.set(-0.65, 1.03, 0.2);
@@ -655,10 +1038,12 @@
     function applyHoloColor(hex) {
       holoLight.color.setHex(hex);
       emitterRing.material.color.setHex(hex);
-      [helmetShellMat, arcCoreMat].forEach(m => {
+      [helmetShellMat, arcCoreMat, armorSurfaceMat, armorDetailMat].forEach(m => {
         m.color.setHex(hex);
         m.emissive.setHex(hex);
       });
+      armorLineMat.color.setHex(hex);
+      suitCoreMat.color.setHex(hex);
       ring1.material.color.setHex(hex);
       ring2.material.color.setHex(hex);
     }
@@ -698,12 +1083,105 @@
     c0.add(new THREE.Line(laserGeo, laserMat));
     c1.add(new THREE.Line(laserGeo, laserMat));
 
+    const activeHoloGrips = new Map();
+    let holoGesture = null;
+
+    function resetHoloGesture() {
+      const grips = [...activeHoloGrips.keys()];
+      if (grips.length === 0) {
+        holoGesture = null;
+        return;
+      }
+
+      const first = new THREE.Vector3();
+      grips[0].getWorldPosition(first);
+      const target = activeHoloGrips.get(grips[0]);
+      if (grips.length === 1) {
+        holoGesture = { target, previousCenter: first };
+        return;
+      }
+
+      const second = new THREE.Vector3();
+      grips[1].getWorldPosition(second);
+      const span = second.clone().sub(first);
+      holoGesture = {
+        target,
+        previousCenter: first.clone().add(second).multiplyScalar(0.5),
+        previousDistance: Math.max(span.length(), 0.01),
+        previousAngle: Math.atan2(span.x, span.z)
+      };
+    }
+
+    function startHoloManipulation(controller, grip, grabAudio, gripPos) {
+      const target = activeHoloGrips.size > 0
+        ? activeHoloGrips.values().next().value
+        : activeHologram;
+      if (!target?.visible) return false;
+
+      const targetPos = new THREE.Vector3();
+      target.getWorldPosition(targetPos);
+      const reach = activeHoloGrips.size > 0 ? 1.1 : 0.75;
+      if (gripPos.distanceTo(targetPos) > reach) return false;
+
+      activeHoloGrips.set(grip, target);
+      controller.userData.holoGrip = grip;
+      resetHoloGesture();
+      if (grabAudio.isPlaying) grabAudio.stop();
+      grabAudio.setBuffer(bufGrab);
+      grabAudio.play();
+      holoStatus.textContent = activeHoloGrips.size === 1
+        ? 'Hologram selected. Move one hand to reposition; squeeze with the other hand to resize and rotate.'
+        : 'Two hands locked. Move them apart or together to resize; twist them to rotate.';
+      return true;
+    }
+
+    function updateHoloManipulation() {
+      if (!holoGesture) return;
+      const grips = [...activeHoloGrips.keys()];
+      const target = holoGesture.target;
+
+      if (grips.length === 1) {
+        const position = new THREE.Vector3();
+        grips[0].getWorldPosition(position);
+        target.position.add(position.clone().sub(holoGesture.previousCenter));
+        holoGesture.previousCenter.copy(position);
+        return;
+      }
+
+      const first = new THREE.Vector3();
+      const second = new THREE.Vector3();
+      grips[0].getWorldPosition(first);
+      grips[1].getWorldPosition(second);
+      const span = second.clone().sub(first);
+      const distance = Math.max(span.length(), 0.01);
+      const center = first.clone().add(second).multiplyScalar(0.5);
+      target.position.add(center.clone().sub(holoGesture.previousCenter));
+
+      const scale = THREE.MathUtils.clamp(
+        target.scale.x * distance / holoGesture.previousDistance,
+        0.2,
+        1.8
+      );
+      target.scale.setScalar(scale);
+      const angle = Math.atan2(span.x, span.z);
+      target.rotation.y += THREE.MathUtils.euclideanModulo(
+        angle - holoGesture.previousAngle + Math.PI,
+        Math.PI * 2
+      ) - Math.PI;
+
+      holoGesture.previousCenter.copy(center);
+      holoGesture.previousDistance = distance;
+      holoGesture.previousAngle = angle;
+    }
+
     function onGrabStart(event) {
       const controller = event.target;
       const grip = (controller === c0) ? cGrip0 : cGrip1;
       const grabAudio = (controller === c0) ? grabAudio0 : grabAudio1;
       const gripPos = new THREE.Vector3();
       grip.getWorldPosition(gripPos);
+
+      if (startHoloManipulation(controller, grip, grabAudio, gripPos)) return;
 
       let closest = null;
       let minDist = 0.28;
@@ -733,6 +1211,14 @@
 
     function onGrabEnd(event) {
       const controller = event.target;
+      if (controller.userData.holoGrip) {
+        activeHoloGrips.delete(controller.userData.holoGrip);
+        delete controller.userData.holoGrip;
+        resetHoloGesture();
+        holoStatus.textContent = 'Hologram released. Squeeze near it again to move, resize, or rotate.';
+        return;
+      }
+
       const held = controller.userData.heldObject;
       if (held) {
         // If holding firing torch, kill audio on drop
@@ -832,15 +1318,24 @@
       const targetLerp = isExploded ? 1.0 : 0.0;
       explodeLerp += (targetLerp - explodeLerp) * 0.08;
 
-      helmetShell.position.y = explodeLerp * 0.35;
-      ring1.position.y = -explodeLerp * 0.2;
-      ring2.position.y = explodeLerp * 0.45;
+      helmetShell.position.y = 0.73 + explodeLerp * 0.35;
+      ring1.position.y = 0.12 - explodeLerp * 0.2;
+      ring2.position.y = 0.12 + explodeLerp * 0.45;
       arcCore.scale.setScalar(1.0 + explodeLerp * 0.4);
+
+      updateHoloManipulation();
 
       // Dum-E joint movement
       lowerArm.rotation.z = Math.sin(time * 1.2) * 0.15;
       upperArm.rotation.x = Math.cos(time * 0.8) * 0.2;
       dume.rotation.y = Math.sin(time * 0.5) * 0.3;
+
+      for (let i = 0; i < vehicleLights.length; i++) {
+        vehicleLights[i].intensity = 2.1 + Math.sin(time * 1.8 + i) * 0.25;
+      }
+      for (let i = 0; i < ceilingLights.length; i++) {
+        ceilingLights[i].intensity = 1.7 + Math.sin(time * 0.7 + i * 0.4) * 0.08;
+      }
 
       hudPlane.lookAt(camera.position);
 
