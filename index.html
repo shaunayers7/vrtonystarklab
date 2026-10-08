@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stark Industries // Malibu Lab & 3D Spatial Audio</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: #040810;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      color: #00f0ff;
+    }
+    #launch-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      background: rgba(8, 14, 26, 0.95);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      padding: 30px 40px;
+      border-radius: 12px;
+      box-shadow: 0 0 35px rgba(0, 240, 255, 0.25);
+      max-width: 500px;
+      z-index: 999;
+    }
+    #launch-overlay h1 {
+      margin: 0 0 10px;
+      font-size: 1.4rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+    #launch-overlay p {
+      font-size: 0.9rem;
+      color: #8be4fc;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+    .action-btn {
+      background: linear-gradient(135deg, #00d2ff 0%, #0077ff 100%);
+      color: #fff;
+      border: none;
+      padding: 12px 28px;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      border-radius: 6px;
+      cursor: pointer;
+      box-shadow: 0 0 15px rgba(0, 210, 255, 0.5);
+      transition: all 0.2s ease;
+    }
+    .action-btn:hover {
+      transform: scale(1.04);
+      box-shadow: 0 0 25px rgba(0, 210, 255, 0.8);
+    }
+    #status-pill {
+      margin-top: 15px;
+      font-size: 0.8rem;
+      color: #38ef7d;
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="launch-overlay">
+    <h1>Stark Malibu Lab</h1>
+    <p>
+      Click below to initialize the <strong>3D Spatial Audio Engine & J.A.R.V.I.S.</strong>, then put on your Quest 3 and enter VR.
+    </p>
+    <button class="action-btn" id="init-btn">INITIALIZE AUDIO & VR</button>
+    <div id="status-pill">Awaiting authorization...</div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { VRButton } from 'three/addons/webxr/VRButton.js';
+    import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+
+    // -------------------------------------------------------------
+    // 1. SCENE SETUP & RENDERER
+    // -------------------------------------------------------------
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x050a12);
+    scene.fog = new THREE.FogExp2(0x050a12, 0.035);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.xr.enabled = true;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    // -------------------------------------------------------------
+    // 2. PLAYER RIG & 3D AUDIO LISTENER
+    // -------------------------------------------------------------
+    const cameraRig = new THREE.Group();
+    cameraRig.position.set(0, 0, 1.8);
+    scene.add(cameraRig);
+
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 50);
+    cameraRig.add(camera);
+
+    // Attach Three.js AudioListener to the user's head
+    const audioListener = new THREE.AudioListener();
+    camera.add(audioListener);
+
+    // -------------------------------------------------------------
+    // 3. PROCEDURAL SOUND SYNTHESIS ENGINE (No External MP3s Needed)
+    // -------------------------------------------------------------
+    const audioCtx = audioListener.context;
+
+    // Buffer 1: Futuristic Tablet UI Chime
+    function createChimeBuffer() {
+      const sampleRate = audioCtx.sampleRate;
+      const duration = 0.22;
+      const buffer = audioCtx.createBuffer(1, sampleRate * duration, sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < buffer.length; i++) {
+        const t = i / sampleRate;
+        const env = Math.exp(-t * 22);
+        // Dual-harmonic chime: 1174Hz (D6) + 1760Hz (A6)
+        data[i] = (Math.sin(2 * Math.PI * 1174 * t) * 0.6 + Math.sin(2 * Math.PI * 1760 * t) * 0.4) * env;
+      }
+      return buffer;
+    }
+
+    // Buffer 2: Heavy 60Hz Plasma Torch Energy Buzz (Loopable)
+    function createPlasmaBuzzBuffer() {
+      const sampleRate = audioCtx.sampleRate;
+      const duration = 1.0;
+      const buffer = audioCtx.createBuffer(1, sampleRate * duration, sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < buffer.length; i++) {
+        const t = i / sampleRate;
+        const sub = Math.sin(2 * Math.PI * 62 * t) * 0.5;
+        const harmonic = Math.sin(2 * Math.PI * 124 * t) * 0.3;
+        const hiss = (Math.random() * 2 - 1) * 0.2;
+        data[i] = (sub + harmonic + hiss) * 0.6;
+      }
+      return buffer;
+    }
+
+    // Buffer 3: Plasma Torch Ignition Pop
+    function createIgniteBuffer() {
+      const sampleRate = audioCtx.sampleRate;
+      const duration = 0.15;
+      const buffer = audioCtx.createBuffer(1, sampleRate * duration, sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < buffer.length; i++) {
+        const t = i / sampleRate;
+        const freq = 420 - t * 1800; // Rapid downward frequency sweep
+        const env = Math.exp(-t * 28);
+        data[i] = Math.sin(2 * Math.PI * Math.max(freq, 40) * t) * env * 0.8;
+      }
+      return buffer;
+    }
+
+    // Buffer 4: Magnetic Metallic Snap (Grabbing Objects)
+    function createGrabBuffer() {
+      const sampleRate = audioCtx.sampleRate;
+      const duration = 0.08;
+      const buffer = audioCtx.createBuffer(1, sampleRate * duration, sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < buffer.length; i++) {
+        const t = i / sampleRate;
+        const env = Math.exp(-t * 60);
+        data[i] = ((Math.random() * 2 - 1) * 0.4 + Math.sin(2 * Math.PI * 880 * t) * 0.6) * env;
+      }
+      return buffer;
+    }
+
+    // Buffer 5: Continuous Holographic Table Ambient Hum
+    function createHoloHumBuffer() {
+      const sampleRate = audioCtx.sampleRate;
+      const duration = 2.0;
+      const buffer = audioCtx.createBuffer(1, sampleRate * duration, sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < buffer.length; i++) {
+        const t = i / sampleRate;
+        const hum = Math.sin(2 * Math.PI * 110 * t) * 0.08;
+        const harmonic = Math.sin(2 * Math.PI * 220 * t) * 0.03;
+        data[i] = hum + harmonic;
+      }
+      return buffer;
+    }
+
+    let bufChime, bufPlasma, bufIgnite, bufGrab, bufHoloHum;
+    function initBuffers() {
+      bufChime = createChimeBuffer();
+      bufPlasma = createPlasmaBuzzBuffer();
+      bufIgnite = createIgniteBuffer();
+      bufGrab = createGrabBuffer();
+      bufHoloHum = createHoloHumBuffer();
+    }
+
+    // -------------------------------------------------------------
+    // 4. ARCHITECTURE & LAB ENVIRONMENT
+    // -------------------------------------------------------------
+    const materials = {
+      polishedFloor: new THREE.MeshStandardMaterial({ color: 0x111620, roughness: 0.15, metalness: 0.8 }),
+      wallConcrete: new THREE.MeshStandardMaterial({ color: 0x1a222e, roughness: 0.8 }),
+      brushedMetal: new THREE.MeshStandardMaterial({ color: 0x222a38, metalness: 0.9, roughness: 0.2 }),
+      cyanGlow: new THREE.MeshBasicMaterial({ color: 0x00f0ff }),
+      glass: new THREE.MeshPhysicalMaterial({ color: 0x88ccff, transparent: true, opacity: 0.35, transmission: 0.8, roughness: 0.1 }),
+      cautionStripe: new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.5 })
+    };
+
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(24, 0.4, 20), materials.polishedFloor);
+    floor.position.y = -0.2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    const floorRing = new THREE.Mesh(
+      new THREE.RingGeometry(2.4, 2.45, 64),
+      new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide, transparent: true, opacity: 0.3 })
+    );
+    floorRing.rotation.x = Math.PI / 2;
+    floorRing.position.y = 0.005;
+    scene.add(floorRing);
+
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(24, 6, 0.6), materials.wallConcrete);
+    backWall.position.set(0, 3, -8);
+    scene.add(backWall);
+
+    for (let x = -8; x <= 8; x += 4) {
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.6, 20), materials.brushedMetal);
+      beam.position.set(x, 5.7, 0);
+      scene.add(beam);
+    }
+
+    // -------------------------------------------------------------
+    // 5. HALL OF ARMOR PODS
+    // -------------------------------------------------------------
+    for (let i = 0; i < 4; i++) {
+      const podGroup = new THREE.Group();
+      podGroup.position.set((i - 1.5) * 3.2, 0, -7.2);
+
+      const podFrame = new THREE.Mesh(new THREE.BoxGeometry(2.2, 4.0, 1.4), materials.brushedMetal);
+      podFrame.position.y = 2.0;
+      const podGlass = new THREE.Mesh(new THREE.BoxGeometry(2.0, 3.8, 0.05), materials.glass);
+      podGlass.position.set(0, 2.0, 0.7);
+
+      const podBase = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.9, 0.2, 32), materials.brushedMetal);
+      podBase.position.y = 0.1;
+
+      const uplight = new THREE.PointLight(0x00d2ff, 1.2, 4);
+      uplight.position.set(0, 0.4, 0);
+
+      const dummyArmor = new THREE.Group();
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.3), materials.brushedMetal);
+      torso.position.y = 1.6;
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.3, 0.25), materials.brushedMetal);
+      head.position.y = 2.15;
+      const arcGlow = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), materials.cyanGlow);
+      arcGlow.position.set(0, 1.7, 0.16);
+      dummyArmor.add(torso, head, arcGlow);
+
+      podGroup.add(podBase, podGlass, uplight, dummyArmor);
+      scene.add(podGroup);
+    }
+
+    // -------------------------------------------------------------
+    // 6. THE CENTRAL STARK HOLOTABLE & SPATIAL HUM
+    // -------------------------------------------------------------
+    const tableGroup = new THREE.Group();
+    tableGroup.position.set(0, 0, 0);
+
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.5, 0.1, 8), materials.brushedMetal);
+    top.position.y = 0.95;
+    tableGroup.add(top);
+
+    const emitterRing = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.65, 48), materials.cyanGlow);
+    emitterRing.rotation.x = -Math.PI / 2;
+    emitterRing.position.y = 1.002;
+    tableGroup.add(emitterRing);
+
+    const holoLight = new THREE.PointLight(0x00f0ff, 2.5, 4);
+    holoLight.position.set(0, 1.2, 0);
+    tableGroup.add(holoLight);
+
+    const padTray = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.015, 0.28), materials.brushedMetal);
+    padTray.position.set(-0.65, 1.005, 0.2);
+    tableGroup.add(padTray);
+
+    const toolTray = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.015, 0.15), materials.brushedMetal);
+    toolTray.position.set(0.65, 1.005, 0.2);
+    tableGroup.add(toolTray);
+
+    // 3D Spatial Audio Emitter for the Holotable Projector
+    const tableAudio = new THREE.PositionalAudio(audioListener);
+    tableAudio.setRefDistance(1.2);
+    tableAudio.setMaxDistance(12);
+    tableAudio.setRolloffFactor(1.5);
+    tableGroup.add(tableAudio);
+
+    scene.add(tableGroup);
+
+    // -------------------------------------------------------------
+    // 7. DUM-E ROBOTIC ARM
+    // -------------------------------------------------------------
+    const dume = new THREE.Group();
+    dume.position.set(1.4, 1.0, -0.4);
+
+    const baseCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.15, 16), materials.cautionStripe);
+    dume.add(baseCyl);
+
+    const lowerArm = new THREE.Group();
+    lowerArm.position.y = 0.1;
+    const lowerMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.08), materials.brushedMetal);
+    lowerMesh.position.y = 0.25;
+    lowerArm.add(lowerMesh);
+    dume.add(lowerArm);
+
+    const upperArm = new THREE.Group();
+    upperArm.position.y = 0.5;
+    const upperMesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.45, 0.06), materials.brushedMetal);
+    upperMesh.position.y = 0.22;
+    upperArm.add(upperMesh);
+    lowerArm.add(upperArm);
+
+    const dunceCap = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.2, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    dunceCap.position.set(0, 0.5, 0);
+    upperArm.add(dunceCap);
+    scene.add(dume);
+
+    // -------------------------------------------------------------
+    // 8. HOLOGRAPHIC MARK ARMOR ASSEMBLY
+    // -------------------------------------------------------------
+    const holoAssembly = new THREE.Group();
+    holoAssembly.position.set(0, 1.45, 0);
+
+    let holoColorHex = 0x00f0ff;
+    function makeHoloMat(opacity = 0.75, wireframe = true) {
+      return new THREE.MeshStandardMaterial({
+        color: holoColorHex,
+        emissive: holoColorHex,
+        emissiveIntensity: 0.6,
+        wireframe: wireframe,
+        transparent: true,
+        opacity: opacity,
+        roughness: 0.1,
+        metalness: 0.8
+      });
+    }
+
+    const helmetShellMat = makeHoloMat(0.65, true);
+    const helmetShell = new THREE.Mesh(new THREE.SphereGeometry(0.22, 18, 18), helmetShellMat);
+    helmetShell.scale.set(0.9, 1.15, 1.05);
+
+    const arcCoreMat = makeHoloMat(0.9, false);
+    const arcCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.08, 2), arcCoreMat);
+
+    const ring1 = new THREE.Mesh(new THREE.RingGeometry(0.32, 0.33, 48), new THREE.MeshBasicMaterial({ color: holoColorHex, side: THREE.DoubleSide }));
+    ring1.rotation.x = Math.PI / 2;
+    const ring2 = new THREE.Mesh(new THREE.RingGeometry(0.38, 0.39, 48), new THREE.MeshBasicMaterial({ color: holoColorHex, side: THREE.DoubleSide }));
+    ring2.rotation.x = Math.PI / 2.2;
+
+    holoAssembly.add(helmetShell, arcCore, ring1, ring2);
+    scene.add(holoAssembly);
+
+    // -------------------------------------------------------------
+    // 9. STARKPAD TABLET + 3D POSITIONAL CHIME AUDIO
+    // -------------------------------------------------------------
+    const grabbables = [];
+
+    const padGroup = new THREE.Group();
+    padGroup.position.set(-0.65, 1.03, 0.2);
+    padGroup.rotation.x = -Math.PI / 2;
+
+    const padBody = new THREE.Mesh(
+      new THREE.BoxGeometry(0.32, 0.22, 0.012),
+      new THREE.MeshStandardMaterial({ color: 0x1a2433, metalness: 0.9, roughness: 0.2 })
+    );
+    padGroup.add(padBody);
+
+    const padEdge = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(0.322, 0.222, 0.013)),
+      new THREE.LineBasicMaterial({ color: 0x00f0ff })
+    );
+    padGroup.add(padEdge);
+
+    const padCanvas = document.createElement('canvas');
+    padCanvas.width = 512;
+    padCanvas.height = 340;
+    const padCtx = padCanvas.getContext('2d');
+    const padTexture = new THREE.CanvasTexture(padCanvas);
+
+    const padScreen = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.30, 0.20),
+      new THREE.MeshBasicMaterial({ map: padTexture, transparent: true })
+    );
+    padScreen.position.z = 0.007;
+    padGroup.add(padScreen);
+
+    // StarkPad 3D Audio Emitter
+    const padAudio = new THREE.PositionalAudio(audioListener);
+    padAudio.setRefDistance(0.8);
+    padAudio.setMaxDistance(10);
+    padAudio.setRolloffFactor(1.8);
+    padGroup.add(padAudio);
+
+    let tabletScreenMode = 0;
+    const tabletModes = ["DIAGNOSTICS", "POWER GRID", "REPULSOR CALIBRATION"];
+
+    function updateTabletScreen() {
+      padCtx.fillStyle = '#06101c';
+      padCtx.fillRect(0, 0, 512, 340);
+
+      padCtx.fillStyle = '#00f0ff';
+      padCtx.font = 'bold 22px monospace';
+      padCtx.fillText("STARKPAD // OS 14.2", 20, 36);
+
+      padCtx.fillStyle = '#ff7700';
+      padCtx.font = 'bold 18px sans-serif';
+      padCtx.fillText(`[${tabletModes[tabletScreenMode]}]`, 310, 36);
+
+      padCtx.strokeStyle = '#00f0ff55';
+      padCtx.lineWidth = 2;
+      padCtx.beginPath();
+      padCtx.moveTo(20, 48);
+      padCtx.lineTo(492, 48);
+      padCtx.stroke();
+
+      if (tabletScreenMode === 0) {
+        padCtx.fillStyle = '#ffffff';
+        padCtx.font = '20px monospace';
+        padCtx.fillText("ARC CORE OUTPUT: 3.2 GJ/s", 25, 90);
+        padCtx.fillText("ARMOR PLATING: TITANIUM-GOLD", 25, 125);
+        padCtx.fillText("THRUST VECTOR: NOMINAL", 25, 160);
+        padCtx.fillText("DEFENSE PROTOCOL: LEVEL 5", 25, 195);
+      } else if (tabletScreenMode === 1) {
+        padCtx.fillStyle = '#38ef7d';
+        padCtx.font = '20px monospace';
+        padCtx.fillText("GRID STATUS: 99.4% STABLE", 25, 90);
+        padCtx.fillText("AUX GENERATOR: ACTIVE", 25, 125);
+        padCtx.fillText("COOLING SYSTEM: CRYOGENIC", 25, 160);
+        padCtx.fillText("DUM-E INTEGRITY: QUESTIONABLE", 25, 195);
+      } else {
+        padCtx.fillStyle = '#ff3366';
+        padCtx.font = '20px monospace';
+        padCtx.fillText("LEFT REPULSOR: 100% READY", 25, 90);
+        padCtx.fillText("RIGHT REPULSOR: 100% READY", 25, 125);
+        padCtx.fillText("UNIBEAM VOLTAGE: CHARGED", 25, 160);
+        padCtx.fillText("TARGET LOCK: STANDBY", 25, 195);
+      }
+
+      padCtx.fillStyle = '#00d2ff';
+      for (let i = 0; i < 28; i++) {
+        const barH = Math.random() * 45 + 5;
+        padCtx.fillRect(25 + i * 16, 300 - barH, 10, barH);
+      }
+      padTexture.needsUpdate = true;
+    }
+    updateTabletScreen();
+
+    padGroup.userData = {
+      isGrabbable: true,
+      heldBy: null,
+      onTrigger: () => {
+        tabletScreenMode = (tabletScreenMode + 1) % tabletModes.length;
+        updateTabletScreen();
+
+        // Play 3D chime right at the tablet's position
+        if (padAudio.isPlaying) padAudio.stop();
+        padAudio.setBuffer(bufChime);
+        padAudio.play();
+
+        jarvisSpeak(`Switching StarkPad to ${tabletModes[tabletScreenMode]} mode.`);
+      }
+    };
+    grabbables.push(padGroup);
+    scene.add(padGroup);
+
+    // -------------------------------------------------------------
+    // 10. ARC PLASMA TORCH + 3D POSITIONAL BUZZ & IGNITE
+    // -------------------------------------------------------------
+    const toolGroup = new THREE.Group();
+    toolGroup.position.set(0.65, 1.04, 0.2);
+
+    const toolHandle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.02, 0.025, 0.18, 16),
+      new THREE.MeshStandardMaterial({ color: 0x222a36, roughness: 0.3, metalness: 0.9 })
+    );
+    toolHandle.rotation.x = Math.PI / 2;
+    toolGroup.add(toolHandle);
+
+    const toolGuard = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.02, 16), materials.cautionStripe);
+    toolGuard.position.z = -0.06;
+    toolGuard.rotation.x = Math.PI / 2;
+    toolGroup.add(toolGuard);
+
+    const nozzle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.02, 0.07, 16),
+      new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.2 })
+    );
+    nozzle.position.z = -0.12;
+    nozzle.rotation.x = Math.PI / 2;
+    toolGroup.add(nozzle);
+
+    const beamGeo = new THREE.CylinderGeometry(0.005, 0.012, 0.65, 8);
+    const beamMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.9 });
+    const beam = new THREE.Mesh(beamGeo, beamMat);
+    beam.position.z = -0.45;
+    beam.rotation.x = Math.PI / 2;
+    beam.visible = false;
+    toolGroup.add(beam);
+
+    const beamLight = new THREE.PointLight(0x00f0ff, 0, 2.5);
+    beamLight.position.z = -0.45;
+    toolGroup.add(beamLight);
+
+    // 3D Spatial Audio Emitters on the Plasma Nozzle
+    const torchIgniteAudio = new THREE.PositionalAudio(audioListener);
+    torchIgniteAudio.setRefDistance(0.8);
+    torchIgniteAudio.setMaxDistance(12);
+    toolGroup.add(torchIgniteAudio);
+
+    const torchBuzzAudio = new THREE.PositionalAudio(audioListener);
+    torchBuzzAudio.setRefDistance(1.0);
+    torchBuzzAudio.setMaxDistance(12);
+    torchBuzzAudio.setRolloffFactor(1.5);
+    torchBuzzAudio.setLoop(true);
+    toolGroup.add(torchBuzzAudio);
+
+    toolGroup.userData = {
+      isGrabbable: true,
+      heldBy: null,
+      isFiring: false,
+      onTriggerStart: () => {
+        toolGroup.userData.isFiring = true;
+        beam.visible = true;
+        beamLight.intensity = 3.5;
+
+        // Play 3D ignition pop
+        if (torchIgniteAudio.isPlaying) torchIgniteAudio.stop();
+        torchIgniteAudio.setBuffer(bufIgnite);
+        torchIgniteAudio.play();
+
+        // Start looping plasma hum
+        if (!torchBuzzAudio.isPlaying) {
+          torchBuzzAudio.setBuffer(bufPlasma);
+          torchBuzzAudio.play();
+        }
+      },
+      onTriggerEnd: () => {
+        toolGroup.userData.isFiring = false;
+        beam.visible = false;
+        beamLight.intensity = 0;
+
+        // Stop continuous plasma buzz
+        if (torchBuzzAudio.isPlaying) {
+          torchBuzzAudio.stop();
+        }
+      }
+    };
+    grabbables.push(toolGroup);
+    scene.add(toolGroup);
+
+    // -------------------------------------------------------------
+    // 11. CONTROLLER 3D GRAB SOUNDS
+    // -------------------------------------------------------------
+    const grabAudio0 = new THREE.PositionalAudio(audioListener);
+    const grabAudio1 = new THREE.PositionalAudio(audioListener);
+    grabAudio0.setRefDistance(0.5);
+    grabAudio1.setRefDistance(0.5);
+
+    // -------------------------------------------------------------
+    // 12. J.A.R.V.I.S. HUD BILLBOARD & SPEECH ENGINE
+    // -------------------------------------------------------------
+    const hudCanvas = document.createElement('canvas');
+    hudCanvas.width = 512;
+    hudCanvas.height = 256;
+    const hudCtx = hudCanvas.getContext('2d');
+    const hudTexture = new THREE.CanvasTexture(hudCanvas);
+
+    const hudPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.7, 0.35),
+      new THREE.MeshBasicMaterial({ map: hudTexture, transparent: true, side: THREE.DoubleSide })
+    );
+    hudPlane.position.set(0, 1.95, -0.2);
+    scene.add(hudPlane);
+
+    function updateJarvisHUD(mainText, subText = "J.A.R.V.I.S. // ONLINE") {
+      hudCtx.clearRect(0, 0, 512, 256);
+      hudCtx.strokeStyle = 'rgba(0, 240, 255, 0.6)';
+      hudCtx.lineWidth = 4;
+      hudCtx.strokeRect(10, 10, 492, 236);
+
+      hudCtx.fillStyle = '#00f0ff';
+      hudCtx.font = 'bold 24px monospace';
+      hudCtx.fillText(subText, 25, 48);
+
+      hudCtx.fillStyle = '#ffffff';
+      hudCtx.font = 'bold 26px sans-serif';
+      hudCtx.fillText(mainText, 25, 120);
+
+      hudCtx.fillStyle = 'rgba(0, 240, 255, 0.7)';
+      for (let i = 0; i < 20; i++) {
+        const h = Math.random() * 30 + 5;
+        hudCtx.fillRect(25 + i * 23, 180 - h / 2, 14, h);
+      }
+      hudTexture.needsUpdate = true;
+    }
+    updateJarvisHUD("Awaiting voice command, sir.");
+
+    let isExploded = false;
+    function jarvisSpeak(phrase) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(phrase);
+      const voices = window.speechSynthesis.getVoices();
+      const british = voices.find(v => v.lang.includes('en-GB') || v.name.includes('UK') || v.name.includes('George'));
+      if (british) utterance.voice = british;
+      utterance.pitch = 0.95;
+      utterance.rate = 1.0;
+      window.speechSynthesis.speak(utterance);
+      updateJarvisHUD(phrase, "J.A.R.V.I.S. // RESPONDING");
+    }
+
+    function handleJarvisCommand(rawTranscript) {
+      const text = rawTranscript.toLowerCase().trim();
+      updateJarvisHUD(`"${text}"`, "TRANSCRIPT RECEIVED");
+
+      if (text.includes("explode") || text.includes("disassemble")) {
+        isExploded = true;
+        jarvisSpeak("Expanding armor telemetry, sir.");
+      } else if (text.includes("assemble") || text.includes("put back")) {
+        isExploded = false;
+        jarvisSpeak("Reassembling components.");
+      } else if (text.includes("red") || text.includes("gold")) {
+        applyHoloColor(0xff3b30);
+        jarvisSpeak("Applying hot-rod crimson palette.");
+      } else if (text.includes("blue") || text.includes("cyan")) {
+        applyHoloColor(0x00f0ff);
+        jarvisSpeak("Restoring Stark cyan.");
+      } else if (text.includes("green")) {
+        applyHoloColor(0x30d158);
+        jarvisSpeak("Switching to diagnostic green.");
+      } else if (text.includes("status") || text.includes("hello")) {
+        jarvisSpeak("Spatial acoustics and workshop tools are online, sir.");
+      }
+    }
+
+    function applyHoloColor(hex) {
+      holoLight.color.setHex(hex);
+      emitterRing.material.color.setHex(hex);
+      [helmetShellMat, arcCoreMat].forEach(m => {
+        m.color.setHex(hex);
+        m.emissive.setHex(hex);
+      });
+      ring1.material.color.setHex(hex);
+      ring2.material.color.setHex(hex);
+    }
+
+    function initSpeechEngine() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) return;
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+      recognition.onresult = (event) => {
+        const lastResult = event.results[event.results.length - 1];
+        if (lastResult.isFinal) handleJarvisCommand(lastResult[0].transcript);
+      };
+      recognition.onend = () => { try { recognition.start(); } catch (_) {} };
+      try { recognition.start(); } catch (_) {}
+    }
+
+    // -------------------------------------------------------------
+    // 13. WEBXR CONTROLLERS, 3D GRAB & TRIGGER INTERACTIONS
+    // -------------------------------------------------------------
+    const controllerFactory = new XRControllerModelFactory();
+    const c0 = renderer.xr.getController(0);
+    const c1 = renderer.xr.getController(1);
+    const cGrip0 = renderer.xr.getControllerGrip(0);
+    const cGrip1 = renderer.xr.getControllerGrip(1);
+
+    cGrip0.add(controllerFactory.createControllerModel(cGrip0));
+    cGrip1.add(controllerFactory.createControllerModel(cGrip1));
+    cGrip0.add(grabAudio0);
+    cGrip1.add(grabAudio1);
+    cameraRig.add(c0, c1, cGrip0, cGrip1);
+
+    const laserGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -2)]);
+    const laserMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.4 });
+    c0.add(new THREE.Line(laserGeo, laserMat));
+    c1.add(new THREE.Line(laserGeo, laserMat));
+
+    function onGrabStart(event) {
+      const controller = event.target;
+      const grip = (controller === c0) ? cGrip0 : cGrip1;
+      const grabAudio = (controller === c0) ? grabAudio0 : grabAudio1;
+      const gripPos = new THREE.Vector3();
+      grip.getWorldPosition(gripPos);
+
+      let closest = null;
+      let minDist = 0.28;
+
+      for (const obj of grabbables) {
+        if (obj.userData.heldBy) continue;
+        const objPos = new THREE.Vector3();
+        obj.getWorldPosition(objPos);
+        const dist = gripPos.distanceTo(objPos);
+        if (dist < minDist) {
+          minDist = dist;
+          closest = obj;
+        }
+      }
+
+      if (closest) {
+        grip.attach(closest);
+        closest.userData.heldBy = grip;
+        controller.userData.heldObject = closest;
+
+        // Play 3D magnetic snap sound directly on the controller
+        if (grabAudio.isPlaying) grabAudio.stop();
+        grabAudio.setBuffer(bufGrab);
+        grabAudio.play();
+      }
+    }
+
+    function onGrabEnd(event) {
+      const controller = event.target;
+      const held = controller.userData.heldObject;
+      if (held) {
+        // If holding firing torch, kill audio on drop
+        if (held.userData.onTriggerEnd && held.userData.isFiring) {
+          held.userData.onTriggerEnd();
+        }
+        scene.attach(held);
+        held.userData.heldBy = null;
+        controller.userData.heldObject = null;
+      }
+    }
+
+    function onTriggerStart(event) {
+      const controller = event.target;
+      const held = controller.userData.heldObject;
+
+      if (held) {
+        if (held.userData.onTrigger) held.userData.onTrigger();
+        if (held.userData.onTriggerStart) held.userData.onTriggerStart();
+      } else {
+        isExploded = !isExploded;
+        jarvisSpeak(isExploded ? "Exploding schematics." : "Reassembling components.");
+      }
+    }
+
+    function onTriggerEnd(event) {
+      const controller = event.target;
+      const held = controller.userData.heldObject;
+      if (held && held.userData.onTriggerEnd) {
+        held.userData.onTriggerEnd();
+      }
+    }
+
+    [c0, c1].forEach(c => {
+      c.addEventListener('squeezestart', onGrabStart);
+      c.addEventListener('squeezeend', onGrabEnd);
+      c.addEventListener('selectstart', onTriggerStart);
+      c.addEventListener('selectend', onTriggerEnd);
+    });
+
+    // -------------------------------------------------------------
+    // 14. LOCOMOTION ENGINE (Thumbsticks)
+    // -------------------------------------------------------------
+    const clock = new THREE.Clock();
+    let snapCooldown = 0;
+
+    function handleLocomotion(delta) {
+      const session = renderer.xr.getSession();
+      if (!session) return;
+
+      for (const source of session.inputSources) {
+        if (!source.gamepad) continue;
+        const axes = source.gamepad.axes;
+        const x = Math.abs(axes[2]) > 0.05 ? axes[2] : (Math.abs(axes[0]) > 0.05 ? axes[0] : 0);
+        const y = Math.abs(axes[3]) > 0.05 ? axes[3] : (Math.abs(axes[1]) > 0.05 ? axes[1] : 0);
+
+        if (source.handedness === 'left' && (Math.abs(x) > 0.15 || Math.abs(y) > 0.15)) {
+          const forward = new THREE.Vector3();
+          camera.getWorldDirection(forward);
+          forward.y = 0;
+          forward.normalize();
+          const right = new THREE.Vector3().crossVectors(camera.up, forward).negate().normalize();
+
+          cameraRig.position.addScaledVector(forward, -y * 3.0 * delta);
+          cameraRig.position.addScaledVector(right, x * 3.0 * delta);
+        }
+
+        if (source.handedness === 'right' && snapCooldown <= 0) {
+          if (x > 0.6) {
+            cameraRig.rotation.y -= Math.PI / 4;
+            snapCooldown = 0.3;
+          } else if (x < -0.6) {
+            cameraRig.rotation.y += Math.PI / 4;
+            snapCooldown = 0.3;
+          }
+        }
+      }
+      if (snapCooldown > 0) snapCooldown -= delta;
+    }
+
+    // -------------------------------------------------------------
+    // 15. MAIN RENDER LOOP & AUDIO LISTENER SYNC
+    // -------------------------------------------------------------
+    let explodeLerp = 0;
+
+    renderer.setAnimationLoop((timestamp) => {
+      const delta = clock.getDelta();
+      const time = timestamp * 0.001;
+
+      handleLocomotion(delta);
+
+      // Holo rotation
+      arcCore.rotation.y = time * 0.9;
+      ring1.rotation.z = time * 0.3;
+      ring2.rotation.z = -time * 0.25;
+
+      const targetLerp = isExploded ? 1.0 : 0.0;
+      explodeLerp += (targetLerp - explodeLerp) * 0.08;
+
+      helmetShell.position.y = explodeLerp * 0.35;
+      ring1.position.y = -explodeLerp * 0.2;
+      ring2.position.y = explodeLerp * 0.45;
+      arcCore.scale.setScalar(1.0 + explodeLerp * 0.4);
+
+      // Dum-E joint movement
+      lowerArm.rotation.z = Math.sin(time * 1.2) * 0.15;
+      upperArm.rotation.x = Math.cos(time * 0.8) * 0.2;
+      dume.rotation.y = Math.sin(time * 0.5) * 0.3;
+
+      hudPlane.lookAt(camera.position);
+
+      // Plasma torch beam jitter
+      if (toolGroup.userData.isFiring) {
+        beam.scale.set(
+          1.0 + Math.sin(time * 45) * 0.25,
+          1.0 + Math.cos(time * 45) * 0.25,
+          1.0
+        );
+      }
+
+      renderer.render(scene, camera);
+    });
+
+    // -------------------------------------------------------------
+    // 16. INITIALIZATION & AUDIO UNLOCK
+    // -------------------------------------------------------------
+    document.getElementById('init-btn').addEventListener('click', async () => {
+      // Resume Web Audio Context (Satisfies browser autoplay policy)
+      if (audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
+
+      initBuffers();
+      initSpeechEngine();
+
+      // Start ambient holotable hum
+      tableAudio.setBuffer(bufHoloHum);
+      tableAudio.setLoop(true);
+      tableAudio.setVolume(0.5);
+      tableAudio.play();
+
+      jarvisSpeak("Workshop spatial audio systems active. Welcome home, sir.");
+      document.getElementById('launch-overlay').style.display = 'none';
+      document.body.appendChild(VRButton.createButton(renderer));
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
