@@ -173,17 +173,6 @@
       lightPillar: new THREE.MeshBasicMaterial({ color: 0xffffff })
     };
 
-    // Distinct liveries so all 7 bays look stocked, not copy-pasted
-    const SUIT_PALETTES = [
-      { crimson: 0x8f1626, gold: 0xc9a227 }, // hot-rod classic
-      { crimson: 0xb9c1c9, gold: 0x77808a }, // silver prototype
-      { crimson: 0x7a1f2b, gold: 0xb9c1c9 }, // red / silver
-      { crimson: 0x9b111e, gold: 0xd4af37 }, // HERO (center bay)
-      { crimson: 0x2b3a55, gold: 0xd4af37 }, // stealth blue / gold
-      { crimson: 0x3a3f44, gold: 0xb58a43 }, // gunmetal / bronze
-      { crimson: 0x5c1a1a, gold: 0xe0c070 }  // deep crimson / pale gold
-    ];
-
     // -------------------------------------------------------------
     // 5. HALL OF ARMOR: CURVED BACK WALL WITH 7 ALCOVES
     // -------------------------------------------------------------
@@ -203,7 +192,7 @@
     );
     canopyCurve.rotation.x = Math.PI / 2;
     canopyCurve.rotation.z = Math.PI / 2 - ARC_SPREAD / 2;
-    canopyCurve.position.set(0, 4.4, -1.8);
+    canopyCurve.position.set(0, 3.4, -1.8);
     scene.add(canopyCurve);
 
     for (let i = 0; i < ALCOVE_COUNT; i++) {
@@ -216,30 +205,31 @@
       alcoveGroup.position.set(x, 0, z);
       alcoveGroup.rotation.y = angle;
 
-      const backPlate = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3.8, 0.1), materials.alcoveWall);
-      backPlate.position.set(0, 1.9, -0.6);
+      // Alcove interior sized snug around a ~2.0m suit
+      const backPlate = new THREE.Mesh(new THREE.BoxGeometry(1.25, 2.7, 0.1), materials.alcoveWall);
+      backPlate.position.set(0, 1.35, -0.55);
       alcoveGroup.add(backPlate);
 
-      for (let y = 0.4; y < 3.6; y += 0.3) {
-        const louver = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.04, 0.08), materials.gunmetal);
-        louver.position.set(0, y, -0.54);
+      for (let y = 0.25; y < 2.55; y += 0.25) {
+        const louver = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.035, 0.07), materials.gunmetal);
+        louver.position.set(0, y, -0.49);
         alcoveGroup.add(louver);
       }
 
-      const leftPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3.8, 16), materials.lightPillar);
-      leftPillar.position.set(-0.75, 1.9, 0);
+      const leftPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.7, 16), materials.lightPillar);
+      leftPillar.position.set(-0.62, 1.35, 0);
       const rightPillar = leftPillar.clone();
-      rightPillar.position.x = 0.75;
+      rightPillar.position.x = 0.62;
       alcoveGroup.add(leftPillar, rightPillar);
 
-      const basePlatform = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.12, 1.1), materials.gunmetal);
+      const basePlatform = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.12, 0.85), materials.gunmetal);
       basePlatform.position.set(0, 0.06, 0);
       basePlatform.receiveShadow = true;
       alcoveGroup.add(basePlatform);
 
       const spotLight = new THREE.SpotLight(0xffeaad, 3.5, 7.5, Math.PI / 6, 0.4, 1.2);
-      spotLight.position.set(0, 4.2, 0.2);
-      spotLight.target.position.set(0, 1.2, 0);
+      spotLight.position.set(0, 3.3, 0.2);
+      spotLight.target.position.set(0, 1.0, 0);
       alcoveGroup.add(spotLight);
       alcoveGroup.add(spotLight.target);
 
@@ -252,9 +242,9 @@
     }
 
     // -------------------------------------------------------------
-    // 6. SEGMENTED ARMOR CREATOR (Physical or Holographic)
+    // 6. SEGMENTED ARMOR CREATOR (Holographic fallback for the workbench rig)
     // -------------------------------------------------------------
-    function createSegmentedArmor(isHologram = false, palette = SUIT_PALETTES[3]) {
+    function createSegmentedArmor(isHologram = false, palette = { crimson: 0x9b111e, gold: 0xd4af37 }) {
       const root = new THREE.Group();
 
       let matCrimson = new THREE.MeshStandardMaterial({ color: palette.crimson, metalness: 0.92, roughness: 0.18 });
@@ -374,31 +364,20 @@
       return { root, faceplate: faceplateGroup, helmet: helmetGroup, torso: torsoGroup, armL, armR, legL, legR };
     }
 
-    // Populate ALL 7 alcoves with unique liveries — no empty bays
-    const alcoveSuits = [];
-    alcoveCenters.forEach((bay, i) => {
-      const suit = createSegmentedArmor(false, SUIT_PALETTES[i]);
-      suit.root.position.copy(bay.position);
-      suit.root.rotation.y = bay.rotation;
-      suit.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-      scene.add(suit.root);
-      alcoveSuits.push(suit);
-    });
-
+    // Only the two real GLB suits go on display — no procedural placeholders
     const bay3Data = alcoveCenters[3];
-    const heroSuit = alcoveSuits[3];
 
     // --- LOAD REAL IRON MAN SUITS (.GLB) ---
     // Both Sketchfab exports are raw Z-up meshes (~1818 units tall, identity
     // transforms), so each gets a corrective wrap: rotate to Y-up, scale to ~1.82m.
-    // Falls back to the segmented procedural armor if a file is missing.
+    // The hologram falls back to segmented procedural armor if the hero file is missing.
     let holoIsGLB = false;
     const gltfLoader = new GLTFLoader();
-    const SUIT_SCALE = 0.001;
+    const SUIT_SCALE = 0.0011;
 
     function wrapSuitModel(model) {
       model.rotation.x = -Math.PI / 2; // Z-up -> Y-up
-      model.scale.setScalar(SUIT_SCALE); // 1818 raw units -> ~1.82 m tall
+      model.scale.setScalar(SUIT_SCALE); // 1818 raw units -> ~2.0 m tall
       return model;
     }
 
@@ -427,7 +406,6 @@
       (gltf) => {
         // 1. PHYSICAL DISPLAY SUIT (Center Alcove Bay)
         const physicalSuit = wrapSuitModel(gltf.scene);
-        scene.remove(heroSuit.root); // Retire the segmented placeholder
         placeInAlcove(physicalSuit, bay3Data);
 
         // 2. HOLOGRAPHIC CLONE (Above the workbench)
@@ -471,7 +449,6 @@
     gltfLoader.load(
       './iron-man-mk7_2suit.glb',
       (gltf) => {
-        scene.remove(alcoveSuits[4].root); // Retire the segmented placeholder
         placeInAlcove(wrapSuitModel(gltf.scene), bay4Data);
         jarvisIfReady("Mark Seven variant secured in bay five.");
       },
@@ -561,6 +538,101 @@
     servoAudio.setMaxDistance(10);
     servoAudio.setRolloffFactor(1.6);
     holoRig.add(servoAudio);
+
+    // -------------------------------------------------------------
+    // 8A. HOLO-FORGE: VOICE-CONTROLLED SHAPE MODELING PAD
+    // -------------------------------------------------------------
+    const forgeGroup = new THREE.Group();
+    forgeGroup.position.set(0.55, 1.05, -0.3);
+    scene.add(forgeGroup);
+
+    // Emitter pad glowing on the tabletop beneath the forge hologram
+    const forgePad = new THREE.Mesh(
+      new THREE.RingGeometry(0.16, 0.19, 32),
+      new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide, transparent: true, opacity: 0.7 })
+    );
+    forgePad.rotation.x = -Math.PI / 2;
+    forgePad.position.y = -0.158; // Rests on the tabletop surface (~0.89)
+    forgeGroup.add(forgePad);
+
+    const forgeShapes = [];
+    let forgeSpin = false;
+    let forgeColor = 0x00f0ff;
+    const FORGE_COLORS = { red: 0xff3b30, gold: 0xffd700, blue: 0x00f0ff, cyan: 0x00f0ff, green: 0x30d158, orange: 0xff9500, purple: 0xbf5af2, white: 0xffffff };
+
+    function forgeMaterial(colorHex) {
+      return new THREE.MeshStandardMaterial({
+        color: colorHex,
+        emissive: colorHex,
+        emissiveIntensity: 0.7,
+        transparent: true,
+        opacity: 0.78,
+        roughness: 0.2,
+        metalness: 0.4
+      });
+    }
+
+    function addForgeShape(type) {
+      let geometry;
+      switch (type) {
+        case 'cube': case 'box': geometry = new THREE.BoxGeometry(0.22, 0.22, 0.22); break;
+        case 'sphere': geometry = new THREE.SphereGeometry(0.14, 24, 18); break;
+        case 'cylinder': geometry = new THREE.CylinderGeometry(0.11, 0.11, 0.24, 24); break;
+        case 'torus': geometry = new THREE.TorusGeometry(0.12, 0.045, 12, 32); break;
+        case 'cone': geometry = new THREE.ConeGeometry(0.13, 0.26, 24); break;
+        case 'pyramid': geometry = new THREE.ConeGeometry(0.15, 0.24, 4); break;
+        default: return null;
+      }
+      const mesh = new THREE.Mesh(geometry, forgeMaterial(forgeColor));
+      // White schematic edges make it read as a Stark CAD hologram
+      const edges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(geometry),
+        new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 })
+      );
+      mesh.add(edges);
+      // Arrange successive shapes in a loose cluster above the pad
+      const n = forgeShapes.length;
+      mesh.position.set((n % 3 - 1) * 0.26, 0.2 + Math.floor(n / 3) * 0.3, 0);
+      forgeGroup.add(mesh);
+      forgeShapes.push(mesh);
+      playPositional(servoAudio, bufServo);
+      return mesh;
+    }
+
+    function scaleLastForgeShape(factor) {
+      const last = forgeShapes[forgeShapes.length - 1];
+      if (!last) { jarvisSpeak("The forge pad is empty, sir. Create a shape first."); return; }
+      last.scale.multiplyScalar(factor).clampScalar(0.25, 3);
+      jarvisSpeak(factor > 1 ? "Increasing dimensions." : "Reducing dimensions.");
+    }
+
+    function toggleForgeWireframe() {
+      const last = forgeShapes[forgeShapes.length - 1];
+      if (!last) { jarvisSpeak("Nothing on the forge pad to reformat, sir."); return; }
+      last.material.wireframe = !last.material.wireframe;
+      jarvisSpeak(last.material.wireframe ? "Wireframe schematic view." : "Solid holographic view.");
+    }
+
+    function colorLastForgeShape(colorName) {
+      const last = forgeShapes[forgeShapes.length - 1];
+      const hex = FORGE_COLORS[colorName];
+      if (!last || hex === undefined) return false;
+      last.material.color.setHex(hex);
+      last.material.emissive.setHex(hex);
+      forgeColor = hex;
+      return true;
+    }
+
+    function clearForge() {
+      for (const shape of forgeShapes) {
+        shape.traverse((o) => {
+          if (o.geometry) o.geometry.dispose();
+          if (o.material) o.material.dispose();
+        });
+        forgeGroup.remove(shape);
+      }
+      forgeShapes.length = 0;
+    }
 
     // -------------------------------------------------------------
     // 9. PROCEDURAL SOUND SYNTHESIS ENGINE (No External MP3s Needed)
@@ -717,19 +789,23 @@
 
       termCtx.fillStyle = '#ffffff';
       termCtx.font = '24px monospace';
-      termCtx.fillText("• RIGHT STICK (Left/Right): Spin suit 360°", 50, 360);
-      termCtx.fillText("• RIGHT STICK (Up/Down): Scale size larger/smaller", 50, 400);
-      termCtx.fillText("• INDEX TRIGGER (tap): Toggle faceplate mask", 50, 440);
-      termCtx.fillText("• GRIP SQUEEZE: Explode / Assemble schematics", 50, 480);
-      termCtx.fillText("• LEFT STICK: Smooth seated gliding", 50, 520);
+      termCtx.fillText("• RIGHT STICK (Left/Right): Spin suit 360°", 50, 355);
+      termCtx.fillText("• RIGHT STICK (Up/Down): Scale size larger/smaller", 50, 390);
+      termCtx.fillText("• INDEX TRIGGER (tap): Mask / forge wireframe", 50, 425);
+      termCtx.fillText("• GRIP SQUEEZE: Explode / Assemble schematics", 50, 460);
+      termCtx.fillText("• LEFT STICK: Smooth seated gliding", 50, 495);
 
       termCtx.fillStyle = '#38ef7d';
       termCtx.font = 'bold 28px sans-serif';
-      termCtx.fillText("J.A.R.V.I.S. VOICE COMMANDS", 40, 580);
+      termCtx.fillText("J.A.R.V.I.S. VOICE COMMANDS", 40, 540);
 
       termCtx.fillStyle = '#8be4fc';
       termCtx.font = '22px monospace';
-      termCtx.fillText('"Open mask" | "Close mask" | "Explode" | "Assemble" | "Exit simulation"', 50, 625);
+      termCtx.fillText('"Open mask" | "Explode" | "Assemble" | "Exit simulation"', 50, 575);
+
+      termCtx.fillStyle = '#ffd700';
+      termCtx.fillText('FORGE: "Create a sphere / cube / torus / cone / pyramid"', 50, 610);
+      termCtx.fillText('"Shape bigger" | "Shape smaller" | "Wireframe" | "Clear forge"', 50, 642);
 
       termCtx.fillStyle = 'rgba(0, 240, 255, 0.2)';
       termCtx.fillRect(40, 660, 944, 60);
@@ -842,6 +918,37 @@
         toggleExplode(true);
       } else if (text.includes("assemble") || text.includes("collapse") || text.includes("put back")) {
         toggleExplode(false);
+      } else if (text.includes("clear forge")) {
+        clearForge();
+        jarvisSpeak("Forge pad cleared.");
+      } else if (text.includes("forge") || text.includes("create") || text.includes("add a") || text.includes("make a")) {
+        const found = ["cube", "box", "sphere", "cylinder", "torus", "cone", "pyramid"].find(t => text.includes(t));
+        if (found) {
+          addForgeShape(found);
+          jarvisSpeak(`Forging ${found === "box" ? "cube" : found} hologram, sir.`);
+        } else if (text.includes("bigger") || text.includes("larger")) {
+          scaleLastForgeShape(1.25);
+        } else if (text.includes("smaller") || text.includes("shrink")) {
+          scaleLastForgeShape(0.8);
+        } else {
+          jarvisSpeak("Specify a shape, sir: cube, sphere, cylinder, torus, cone, or pyramid.");
+        }
+      } else if (text.includes("shape") && (text.includes("bigger") || text.includes("larger") || text.includes("grow"))) {
+        scaleLastForgeShape(1.25);
+      } else if (text.includes("shape") && (text.includes("smaller") || text.includes("shrink"))) {
+        scaleLastForgeShape(0.8);
+      } else if (text.includes("wireframe")) {
+        toggleForgeWireframe();
+      } else if (text.includes("spin") && (text.includes("shape") || text.includes("forge"))) {
+        forgeSpin = !forgeSpin;
+        jarvisSpeak(forgeSpin ? "Rotating the forge model." : "Rotation halted.");
+      } else if (text.includes("make it") || text.includes("colour") || text.includes("color")) {
+        const colorName = Object.keys(FORGE_COLORS).find(c => text.includes(c));
+        if (colorName && colorLastForgeShape(colorName)) {
+          jarvisSpeak(`Recalibrating forge emission to ${colorName}.`);
+        } else if (colorName) {
+          jarvisSpeak("The forge pad is empty, sir. Create a shape first.");
+        }
       } else if (text.includes("rotate left")) {
         holoRig.rotation.y -= 0.6;
       } else if (text.includes("rotate right")) {
@@ -916,7 +1023,8 @@
       h0Pinching: false,
       h1Pinching: false,
       initialDistance: 0,
-      initialScale: 0.65
+      initialScale: 0.65,
+      forgeTarget: false
     };
 
     // One-Hand Grab & Rotate tracker (with tap-vs-drag detection for mask toggle)
@@ -926,7 +1034,8 @@
       lastPos: new THREE.Vector3(),
       moved: 0,
       startTime: 0,
-      startedOnButton: false
+      startedOnButton: false,
+      forgeTarget: false
     };
 
     function onSelectStart(event) {
@@ -947,7 +1056,12 @@
         }
       }
 
-      // 2. Track pinch state
+      // 2. Forge pad proximity determines the gesture target
+      const forgeWorld = new THREE.Vector3();
+      forgeGroup.getWorldPosition(forgeWorld);
+      const nearForge = raycaster.ray.origin.distanceTo(forgeWorld) < 0.55;
+
+      // 3. Track pinch state
       if (controller === c0) grabState.h0Pinching = true;
       if (controller === c1) grabState.h1Pinching = true;
 
@@ -958,13 +1072,15 @@
         c0.getWorldPosition(p0);
         c1.getWorldPosition(p1);
         grabState.initialDistance = p0.distanceTo(p1);
-        grabState.initialScale = holoRig.scale.x;
+        grabState.forgeTarget = nearForge || dragState.forgeTarget;
+        grabState.initialScale = grabState.forgeTarget ? forgeGroup.scale.x : holoRig.scale.x;
         dragState.active = false;
         dragState.controller = null;
       } else {
         // One-handed grab: begin rotate/drag tracking
         dragState.active = true;
         dragState.controller = controller;
+        dragState.forgeTarget = nearForge;
         controller.getWorldPosition(dragState.lastPos);
         dragState.moved = 0;
         dragState.startTime = performance.now();
@@ -977,6 +1093,7 @@
       const controller = event.target;
       if (controller === c0) grabState.h0Pinching = false;
       if (controller === c1) grabState.h1Pinching = false;
+      if (!grabState.h0Pinching && !grabState.h1Pinching) grabState.forgeTarget = false;
 
       if (dragState.startedOnButton) {
         dragState.startedOnButton = false;
@@ -984,11 +1101,16 @@
       }
 
       if (dragState.active && dragState.controller === controller) {
-        // Quick tap (no drag) toggles the faceplate; a hold + drag rotates
+        // Quick tap (no drag): forge tap toggles wireframe, otherwise faceplate
         const quickTap = (performance.now() - dragState.startTime) < 300 && dragState.moved < 0.02;
+        const wasForge = dragState.forgeTarget;
         dragState.active = false;
         dragState.controller = null;
-        if (quickTap) toggleMask();
+        dragState.forgeTarget = false;
+        if (quickTap) {
+          if (wasForge) toggleForgeWireframe();
+          else toggleMask();
+        }
       }
     }
 
@@ -1012,21 +1134,28 @@
     function handleInput(delta) {
       const session = renderer.xr.getSession();
 
-      // One-hand grab & rotate / raise the hologram
+      // One-hand grab: near the forge you move shapes, near the suit you rotate it
       if (dragState.active && dragState.controller && !(grabState.h0Pinching && grabState.h1Pinching)) {
         const pos = new THREE.Vector3();
         dragState.controller.getWorldPosition(pos);
         const dx = pos.x - dragState.lastPos.x;
         const dy = pos.y - dragState.lastPos.y;
-        holoRig.rotation.y += dx * 4.0;
-        holoBaseY = THREE.MathUtils.clamp(holoBaseY + dy * 0.5, 0.7, 1.6);
-        dragState.moved += Math.abs(dx) + Math.abs(dy);
+        const dz = pos.z - dragState.lastPos.z;
+        if (dragState.forgeTarget) {
+          forgeGroup.position.x += dx;
+          forgeGroup.position.z += dz;
+          forgeGroup.position.y = THREE.MathUtils.clamp(forgeGroup.position.y + dy, 1.0, 1.9);
+        } else {
+          holoRig.rotation.y += dx * 4.0;
+          holoBaseY = THREE.MathUtils.clamp(holoBaseY + dy * 0.5, 0.7, 1.6);
+        }
+        dragState.moved += Math.abs(dx) + Math.abs(dy) + Math.abs(dz);
         dragState.lastPos.copy(pos);
       }
 
       if (!session) return;
 
-      // Two-Handed Pinch & Pull (Expands or contracts hologram scale)
+      // Two-Handed Pinch & Pull (scales the forge model or the suit hologram)
       if (grabState.h0Pinching && grabState.h1Pinching && grabState.initialDistance > 0.05) {
         const p0 = new THREE.Vector3();
         const p1 = new THREE.Vector3();
@@ -1034,8 +1163,11 @@
         c1.getWorldPosition(p1);
         const currentDist = p0.distanceTo(p1);
         const scaleMultiplier = currentDist / grabState.initialDistance;
-        const targetScale = THREE.MathUtils.clamp(grabState.initialScale * scaleMultiplier, 0.25, 1.8);
-        holoRig.scale.setScalar(targetScale);
+        if (grabState.forgeTarget) {
+          forgeGroup.scale.setScalar(THREE.MathUtils.clamp(grabState.initialScale * scaleMultiplier, 0.4, 2.5));
+        } else {
+          holoRig.scale.setScalar(THREE.MathUtils.clamp(grabState.initialScale * scaleMultiplier, 0.25, 1.8));
+        }
       }
 
       // Thumbstick Locomotion & Suit Control
@@ -1100,6 +1232,10 @@
       gimbalRing1.rotation.z = time * 0.3;
       holoRig.position.y = holoBaseY + Math.sin(time * 1.2) * 0.025;
       holoLight.intensity = 2.6 + Math.sin(time * 2.2) * 0.25;
+
+      // Holo-forge: optional spin + emitter pad pulse
+      if (forgeSpin) forgeGroup.rotation.y += delta * 0.8;
+      forgePad.material.opacity = 0.55 + Math.sin(time * 3) * 0.2;
 
       // DamagedHelmet turntable
       helmetAnchor.rotation.y = time * 0.4;
