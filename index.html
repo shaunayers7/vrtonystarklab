@@ -377,18 +377,18 @@
 
     // --- LOAD REAL IRON MAN SUITS (.GLB) ---
     // Both Sketchfab exports are raw Z-up meshes (~1818 units tall, identity
-    // transforms), so each gets a corrective wrap: rotate to Y-up, scale to ~1.82m.
+    // transforms), so each instance gets its own upright correction and scale.
     // The hologram falls back to segmented procedural armor if the hero file is missing.
     let holoIsGLB = false;
     const gltfLoader = new GLTFLoader();
     const SUIT_SCALE = 0.0011;
 
     function wrapSuitModel(model) {
-      const wrapper = new THREE.Group();
-      model.rotation.x = -Math.PI / 2; // Keep the Z-up -> Y-up correction independent of bay rotation.
-      model.scale.setScalar(SUIT_SCALE);
-      wrapper.add(model);
-      return wrapper;
+      const uprightModel = new THREE.Group();
+      uprightModel.rotation.x = -Math.PI / 2;
+      uprightModel.scale.setScalar(SUIT_SCALE);
+      uprightModel.add(model);
+      return uprightModel;
     }
 
     function placeInAlcove(wrapper, bay) {
@@ -415,11 +415,11 @@
       './iron_man_mk7.glb',
       (gltf) => {
         // 1. PHYSICAL DISPLAY SUIT (Center Alcove Bay)
-        const physicalSuit = wrapSuitModel(gltf.scene);
+        const physicalSuit = wrapSuitModel(SkeletonUtils.clone(gltf.scene));
         placeInAlcove(physicalSuit, bay3Data);
 
         // 2. HOLOGRAPHIC CLONE (Above the workbench)
-        const holoClone = SkeletonUtils.clone(physicalSuit);
+        const holoClone = wrapSuitModel(SkeletonUtils.clone(gltf.scene));
         holoClone.traverse((child) => {
           if (child.isMesh) {
             child.castShadow = false;
