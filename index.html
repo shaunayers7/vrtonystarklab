@@ -139,6 +139,7 @@
     import * as THREE from 'three';
     import { VRButton } from 'three/addons/webxr/VRButton.js';
     import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
     // -------------------------------------------------------------
     // 1. SCENE SETUP & RENDERER
@@ -153,7 +154,13 @@
     renderer.xr.enabled = true;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
     document.body.appendChild(renderer.domElement);
+    const environmentGenerator = new THREE.PMREMGenerator(renderer);
+    scene.environment = environmentGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+    environmentGenerator.dispose();
 
     const roomLight = new THREE.HemisphereLight(0x8bdfff, 0x101522, 1.15);
     scene.add(roomLight);
@@ -337,7 +344,7 @@
     // -------------------------------------------------------------
     // 4A. PROTOTYPE VEHICLE BAYS
     // -------------------------------------------------------------
-    const vehiclePaints = [0xb51f34, 0x263b55];
+    const vehiclePaints = [0x861d2b, 0x183047];
     const vehicleLights = [];
 
     function createPrototypeCar(paintColor, position, bayLabel) {
@@ -346,20 +353,30 @@
 
       const paint = new THREE.MeshStandardMaterial({
         color: paintColor,
-        metalness: 0.82,
-        roughness: 0.22
+        metalness: 0.72,
+        roughness: 0.24,
+        clearcoat: 1,
+        clearcoatRoughness: 0.12
       });
       const darkGlass = new THREE.MeshPhysicalMaterial({
-        color: 0x07131e,
-        metalness: 0.55,
-        roughness: 0.12,
+        color: 0x162b38,
+        metalness: 0.35,
+        roughness: 0.08,
+        transmission: 0.35,
         transparent: true,
-        opacity: 0.9
+        opacity: 0.96,
+        clearcoat: 1
       });
-      const tire = new THREE.MeshStandardMaterial({ color: 0x080b10, roughness: 0.8 });
-      const alloy = new THREE.MeshStandardMaterial({ color: 0x9eb5c7, metalness: 0.9, roughness: 0.25 });
-      const cyan = new THREE.MeshBasicMaterial({ color: 0x00eaff });
-      const red = new THREE.MeshBasicMaterial({ color: 0xff294f });
+      const tire = new THREE.MeshStandardMaterial({ color: 0x101215, roughness: 0.78 });
+      const alloy = new THREE.MeshStandardMaterial({ color: 0x9ba9b4, metalness: 0.94, roughness: 0.2 });
+      const chrome = new THREE.MeshStandardMaterial({ color: 0x657783, metalness: 0.92, roughness: 0.22 });
+      const headlampMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0xdaf7ff,
+        emissive: 0x5dcfff,
+        emissiveIntensity: 1.4,
+        roughness: 0.12
+      });
+      const rearLampMaterial = new THREE.MeshBasicMaterial({ color: 0xff173e });
 
       const bay = new THREE.Mesh(
         new THREE.BoxGeometry(3.2, 0.035, 5.8),
@@ -369,64 +386,168 @@
       bay.receiveShadow = true;
       car.add(bay);
 
-      const bayOutline = new THREE.LineSegments(
-        new THREE.EdgesGeometry(new THREE.BoxGeometry(3.22, 0.04, 5.82)),
-        new THREE.LineBasicMaterial({ color: 0x00aeca, transparent: true, opacity: 0.7 })
-      );
-      bayOutline.position.y = 0.04;
-      car.add(bayOutline);
+      function addLoft(stations, material, segments = 32) {
+        const vertices = [];
+        const indices = [];
+        const steps = (stations.length - 1) * 8;
+        function interpolate(key, index, t) {
+          const before = stations[Math.max(index - 1, 0)][key];
+          const start = stations[index][key];
+          const end = stations[index + 1][key];
+          const after = stations[Math.min(index + 2, stations.length - 1)][key];
+          const t2 = t * t;
+          const t3 = t2 * t;
+          return 0.5 * (
+            2 * start +
+            (-before + end) * t +
+            (2 * before - 5 * start + 4 * end - after) * t2 +
+            (-before + 3 * start - 3 * end + after) * t3
+          );
+        }
 
-      const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.82, 0.42, 4.25), paint);
-      chassis.position.y = 0.58;
-      chassis.castShadow = true;
-      car.add(chassis);
+        for (let step = 0; step <= steps; step++) {
+          const along = (step / steps) * (stations.length - 1);
+          const index = Math.min(Math.floor(along), stations.length - 2);
+          const t = along - index;
+          const z = THREE.MathUtils.lerp(stations[index].z, stations[index + 1].z, t);
+          const width = interpolate('width', index, t);
+          const lower = interpolate('lower', index, t);
+          const upper = interpolate('upper', index, t);
+          for (let segment = 0; segment <= segments; segment++) {
+            const angle = (segment / segments) * Math.PI * 2;
+            vertices.push(
+              Math.cos(angle) * width,
+              (lower + upper) * 0.5 + Math.sin(angle) * (upper - lower) * 0.5,
+              z
+            );
+          }
+        }
+        for (let step = 0; step < steps; step++) {
+          for (let segment = 0; segment < segments; segment++) {
+            const a = step * (segments + 1) + segment;
+            const b = a + segments + 1;
+            indices.push(a, a + 1, b, b, a + 1, b + 1);
+          }
+        }
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        car.add(mesh);
+        return mesh;
+      }
 
-      const hood = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.2, 1.25), paint);
-      hood.position.set(0, 0.82, -1.25);
-      hood.castShadow = true;
-      car.add(hood);
+      addLoft([
+        { z: -2.52, width: 0.5, lower: 0.43, upper: 0.66 },
+        { z: -2.28, width: 0.77, lower: 0.35, upper: 0.76 },
+        { z: -1.75, width: 0.9, lower: 0.31, upper: 0.84 },
+        { z: -1.2, width: 0.94, lower: 0.3, upper: 0.87 },
+        { z: -0.5, width: 0.93, lower: 0.3, upper: 0.84 },
+        { z: 0.55, width: 0.94, lower: 0.3, upper: 0.85 },
+        { z: 1.35, width: 0.92, lower: 0.31, upper: 0.87 },
+        { z: 2.1, width: 0.8, lower: 0.35, upper: 0.76 },
+        { z: 2.48, width: 0.52, lower: 0.43, upper: 0.64 }
+      ], paint);
 
-      const rearDeck = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.2, 0.8), paint);
-      rearDeck.position.set(0, 0.82, 1.55);
-      rearDeck.castShadow = true;
-      car.add(rearDeck);
-
-      const canopy = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.48, 1.62), darkGlass);
-      canopy.position.set(0, 0.98, 0.12);
-      canopy.castShadow = true;
-      car.add(canopy);
-
-      const roof = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.08, 0.72), paint);
-      roof.position.set(0, 1.25, 0.12);
-      car.add(roof);
+      addLoft([
+        { z: -1.18, width: 0.69, lower: 0.78, upper: 0.82 },
+        { z: -0.88, width: 0.69, lower: 0.81, upper: 1.13 },
+        { z: -0.42, width: 0.65, lower: 0.82, upper: 1.43 },
+        { z: 0.18, width: 0.62, lower: 0.82, upper: 1.48 },
+        { z: 0.72, width: 0.64, lower: 0.82, upper: 1.34 },
+        { z: 1.12, width: 0.69, lower: 0.79, upper: 0.91 }
+      ], darkGlass, 24);
 
       for (const side of [-1, 1]) {
-        const sill = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.07, 2.8), cyan);
-        sill.position.set(side * 0.93, 0.48, 0.05);
-        car.add(sill);
+        const windowTrim = new THREE.Mesh(
+          new THREE.TorusGeometry(0.48, 0.018, 8, 36, Math.PI),
+          chrome
+        );
+        windowTrim.rotation.z = Math.PI / 2;
+        windowTrim.rotation.y = side * 0.08;
+        windowTrim.position.set(side * 0.69, 0.96, -0.03);
+        car.add(windowTrim);
 
-        for (const z of [-1.35, 1.35]) {
-          const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.22, 24), tire);
-          wheel.rotation.z = Math.PI / 2;
-          wheel.position.set(side * 0.92, 0.39, z);
+        for (const z of [-1.42, 1.42]) {
+          const wheelArch = new THREE.Mesh(
+            new THREE.TorusGeometry(0.39, 0.045, 10, 40, Math.PI),
+            paint
+          );
+          wheelArch.rotation.y = Math.PI / 2;
+          wheelArch.position.set(side * 0.89, 0.38, z);
+          car.add(wheelArch);
+
+          const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.095, 12, 32), tire);
+          wheel.rotation.y = Math.PI / 2;
+          wheel.position.set(side * 0.91, 0.38, z);
           wheel.castShadow = true;
           car.add(wheel);
 
-          const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.235, 16), alloy);
+          const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.235, 0.235, 0.12, 32), alloy);
+          rim.rotation.z = Math.PI / 2;
+          rim.position.set(side * 0.91, 0.38, z);
+          car.add(rim);
+
+          const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.14, 20), chrome);
           hub.rotation.z = Math.PI / 2;
-          hub.position.set(side * 0.92, 0.39, z);
+          hub.position.set(side * 0.91, 0.38, z);
           car.add(hub);
+
+          for (let spoke = 0; spoke < 10; spoke++) {
+            const angle = (spoke / 10) * Math.PI * 2;
+            const spokeMesh = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.18, 0.035), chrome);
+            spokeMesh.position.set(
+              side * 0.98,
+              0.38 + Math.sin(angle) * 0.13,
+              z + Math.cos(angle) * 0.13
+            );
+            spokeMesh.rotation.x = -angle;
+            car.add(spokeMesh);
+          }
         }
+
+        const mirror = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 12), paint);
+        mirror.scale.set(0.7, 0.55, 1.2);
+        mirror.position.set(side * 0.89, 0.95, -0.85);
+        car.add(mirror);
       }
 
       for (const x of [-0.62, 0.62]) {
-        const headlamp = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.09, 0.035), cyan);
-        headlamp.position.set(x, 0.69, -2.14);
+        const headlamp = new THREE.Mesh(new THREE.SphereGeometry(0.14, 20, 12), headlampMaterial);
+        headlamp.scale.set(1.35, 0.45, 0.18);
+        headlamp.position.set(x, 0.67, -2.27);
         car.add(headlamp);
 
-        const tailLamp = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.08, 0.035), red);
-        tailLamp.position.set(x, 0.72, 2.14);
+        const tailLamp = new THREE.Mesh(new THREE.SphereGeometry(0.13, 20, 12), rearLampMaterial);
+        tailLamp.scale.set(1.4, 0.45, 0.18);
+        tailLamp.position.set(x, 0.68, 2.24);
         car.add(tailLamp);
+      }
+
+      const frontGrille = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.025, 24), chrome);
+      frontGrille.rotation.x = Math.PI / 2;
+      frontGrille.position.set(0, 0.51, -2.45);
+      car.add(frontGrille);
+
+      const splitter = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.045, 0.22), chrome);
+      splitter.position.set(0, 0.34, -2.28);
+      car.add(splitter);
+
+      const rearDiffuser = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 0.18), chrome);
+      rearDiffuser.position.set(0, 0.35, 2.32);
+      car.add(rearDiffuser);
+
+      const sill = new THREE.Mesh(
+        new THREE.BoxGeometry(1.42, 0.045, 0.08),
+        new THREE.MeshStandardMaterial({ color: 0x687783, metalness: 0.9, roughness: 0.3 })
+      );
+      for (const side of [-1, 1]) {
+        const sideSill = sill.clone();
+        sideSill.position.set(side * 0.82, 0.38, 0);
+        car.add(sideSill);
       }
 
       const bayLight = new THREE.PointLight(0x00cfff, 2.4, 5);
@@ -491,9 +612,16 @@
 
       const dummyArmor = new THREE.Group();
       const suitMaterial = new THREE.MeshStandardMaterial({
-        color: [0x687987, 0x454f60, 0x765443, 0x526d79][i],
+        color: [0x9c2925, 0x586878, 0x7e3328, 0x364d63][i],
         metalness: 0.82,
-        roughness: 0.28
+        roughness: 0.24,
+        clearcoat: 0.7,
+        clearcoatRoughness: 0.18
+      });
+      const suitGold = new THREE.MeshStandardMaterial({
+        color: 0xb58a43,
+        metalness: 0.86,
+        roughness: 0.25
       });
       const torso = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.72, 0.34), suitMaterial);
       torso.position.y = 1.6;
@@ -503,23 +631,25 @@
       head.position.y = 2.15;
       const arcGlow = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), materials.cyanGlow);
       arcGlow.position.set(0, 1.7, 0.16);
-      const faceplate = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.11, 0.035), materials.cyanGlow);
-      faceplate.position.set(0, 2.15, 0.15);
+      const faceplate = new THREE.Mesh(new THREE.SphereGeometry(0.115, 16, 12), suitGold);
+      faceplate.scale.set(1.15, 0.5, 0.4);
+      faceplate.position.set(0, 2.15, 0.14);
       dummyArmor.add(torso, pelvis, head, arcGlow, faceplate);
 
       for (const side of [-1, 1]) {
-        const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 10), suitMaterial);
+        const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12), side > 0 ? suitGold : suitMaterial);
         shoulder.position.set(side * 0.4, 1.86, 0);
-        const upperArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.35, 4, 8), suitMaterial);
+        const upperArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.35, 6, 12), suitMaterial);
         upperArm.position.set(side * 0.48, 1.55, 0);
         upperArm.rotation.z = side * -0.08;
-        const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.32, 4, 8), suitMaterial);
+        const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.32, 6, 12), side > 0 ? suitGold : suitMaterial);
         forearm.position.set(side * 0.52, 1.17, 0.01);
-        const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.35, 4, 8), suitMaterial);
+        const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.35, 6, 12), suitMaterial);
         thigh.position.set(side * 0.16, 0.78, 0);
-        const shin = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.34, 4, 8), suitMaterial);
+        const shin = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.34, 6, 12), side > 0 ? suitGold : suitMaterial);
         shin.position.set(side * 0.16, 0.36, 0);
-        const boot = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.16, 0.34), materials.brushedMetal);
+        const boot = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), suitMaterial);
+        boot.scale.set(0.85, 0.55, 1);
         boot.position.set(side * 0.16, 0.1, 0.06);
         dummyArmor.add(shoulder, upperArm, forearm, thigh, shin, boot);
       }
@@ -613,9 +743,18 @@
       });
     }
 
-    const helmetShellMat = makeHoloMat(0.65, true);
+    const helmetShellMat = new THREE.MeshStandardMaterial({
+      color: 0x8d2028,
+      emissive: 0x21080b,
+      emissiveIntensity: 0.35,
+      metalness: 0.78,
+      roughness: 0.22,
+      transparent: true,
+      opacity: 0.88,
+      clearcoat: 0.9
+    });
     const helmetShell = new THREE.Mesh(new THREE.SphereGeometry(0.22, 18, 18), helmetShellMat);
-    helmetShell.scale.set(0.9, 1.15, 1.05);
+    helmetShell.scale.set(1.08, 1.35, 1.12);
     helmetShell.position.y = 0.73;
 
     const arcCoreMat = makeHoloMat(0.9, false);
@@ -630,12 +769,31 @@
     ring2.position.y = 0.12;
 
     const armorFigure = new THREE.Group();
-    const armorSurfaceMat = makeHoloMat(0.42, false);
-    const armorDetailMat = makeHoloMat(0.85, false);
-    const armorLineMat = new THREE.LineBasicMaterial({
-      color: holoColorHex,
+    const armorSurfaceMat = new THREE.MeshStandardMaterial({
+      color: 0x9c2229,
+      emissive: 0x2d0910,
+      emissiveIntensity: 0.4,
+      metalness: 0.8,
+      roughness: 0.24,
       transparent: true,
-      opacity: 0.8
+      opacity: 0.84,
+      clearcoat: 1,
+      clearcoatRoughness: 0.16
+    });
+    const armorDetailMat = new THREE.MeshStandardMaterial({
+      color: 0xb58b47,
+      emissive: 0x291a08,
+      emissiveIntensity: 0.3,
+      metalness: 0.86,
+      roughness: 0.24,
+      transparent: true,
+      opacity: 0.9,
+      clearcoat: 0.8
+    });
+    const armorLineMat = new THREE.LineBasicMaterial({
+      color: 0x54edff,
+      transparent: true,
+      opacity: 0.46
     });
     function addArmorPiece(geometry, position, material = armorSurfaceMat, scale = null) {
       const piece = new THREE.Mesh(geometry, material);
@@ -650,24 +808,25 @@
     }
 
     addArmorPiece(new THREE.BoxGeometry(0.62, 0.72, 0.34), new THREE.Vector3(0, 0.04, 0));
-    addArmorPiece(new THREE.BoxGeometry(0.66, 0.34, 0.1), new THREE.Vector3(0, 0.14, 0.2), armorDetailMat);
+    addArmorPiece(new THREE.SphereGeometry(0.34, 20, 14), new THREE.Vector3(0, 0.14, 0.12), armorDetailMat, new THREE.Vector3(1, 0.48, 0.32));
     addArmorPiece(new THREE.BoxGeometry(0.48, 0.24, 0.3), new THREE.Vector3(0, -0.49, 0));
     addArmorPiece(new THREE.CylinderGeometry(0.09, 0.11, 0.14, 16), new THREE.Vector3(0, 0.48, 0));
-    addArmorPiece(new THREE.BoxGeometry(0.23, 0.1, 0.035), new THREE.Vector3(0, 0.73, 0.2), armorDetailMat);
+    addArmorPiece(new THREE.SphereGeometry(0.18, 18, 12), new THREE.Vector3(0, 0.73, 0.02), armorDetailMat, new THREE.Vector3(1.05, 1.2, 0.92));
+    addArmorPiece(new THREE.BoxGeometry(0.2, 0.045, 0.035), new THREE.Vector3(0, 0.75, 0.19), new THREE.MeshBasicMaterial({ color: 0x9ffaff }));
 
     for (const side of [-1, 1]) {
       addArmorPiece(
-        new THREE.SphereGeometry(0.2, 16, 12),
+        new THREE.SphereGeometry(0.2, 20, 16),
         new THREE.Vector3(side * 0.43, 0.31, 0),
         armorDetailMat,
         new THREE.Vector3(1.1, 0.9, 0.9)
       );
-      addArmorPiece(new THREE.CapsuleGeometry(0.11, 0.3, 4, 8), new THREE.Vector3(side * 0.57, 0.03, 0));
-      addArmorPiece(new THREE.CapsuleGeometry(0.13, 0.32, 4, 8), new THREE.Vector3(side * 0.62, -0.36, 0.01), armorDetailMat);
+      addArmorPiece(new THREE.CapsuleGeometry(0.11, 0.3, 6, 12), new THREE.Vector3(side * 0.57, 0.03, 0));
+      addArmorPiece(new THREE.CapsuleGeometry(0.13, 0.32, 6, 12), new THREE.Vector3(side * 0.62, -0.36, 0.01), armorDetailMat);
       addArmorPiece(new THREE.SphereGeometry(0.12, 12, 10), new THREE.Vector3(side * 0.62, -0.65, 0.02));
-      addArmorPiece(new THREE.CapsuleGeometry(0.15, 0.36, 4, 8), new THREE.Vector3(side * 0.19, -0.78, 0));
+      addArmorPiece(new THREE.CapsuleGeometry(0.15, 0.36, 6, 12), new THREE.Vector3(side * 0.19, -0.78, 0));
       addArmorPiece(new THREE.SphereGeometry(0.15, 12, 10), new THREE.Vector3(side * 0.19, -1.04, 0));
-      addArmorPiece(new THREE.CapsuleGeometry(0.12, 0.4, 4, 8), new THREE.Vector3(side * 0.19, -1.34, 0));
+      addArmorPiece(new THREE.CapsuleGeometry(0.12, 0.4, 6, 12), new THREE.Vector3(side * 0.19, -1.34, 0));
       addArmorPiece(new THREE.BoxGeometry(0.32, 0.2, 0.42), new THREE.Vector3(side * 0.19, -1.62, 0.08), armorDetailMat);
     }
 
