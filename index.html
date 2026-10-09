@@ -3,110 +3,62 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Stark Industries // Malibu Lab & 3D Spatial Audio</title>
+  <title>Stark Hall of Armor // Laboratory</title>
   <style>
     body {
       margin: 0;
-      background-color: #040810;
+      background-color: #020408;
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
       color: #00f0ff;
     }
-    #launch-overlay {
+    #init-overlay {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       text-align: center;
-      background: rgba(8, 14, 26, 0.95);
+      background: rgba(6, 11, 20, 0.96);
       border: 1px solid rgba(0, 240, 255, 0.4);
-      padding: 30px 40px;
+      padding: 32px 42px;
       border-radius: 12px;
-      box-shadow: 0 0 35px rgba(0, 240, 255, 0.25);
-      max-width: 500px;
+      box-shadow: 0 0 40px rgba(0, 240, 255, 0.25);
+      max-width: 520px;
       z-index: 999;
     }
-    #launch-overlay h1 {
+    #init-overlay h1 {
       margin: 0 0 10px;
-      font-size: 1.4rem;
+      font-size: 1.5rem;
       letter-spacing: 3px;
-      text-transform: uppercase;
+      color: #00f0ff;
     }
-    #launch-overlay p {
+    #init-overlay p {
       font-size: 0.9rem;
       color: #8be4fc;
-      line-height: 1.5;
+      line-height: 1.6;
       margin-bottom: 24px;
     }
     .action-btn {
-      background: linear-gradient(135deg, #00d2ff 0%, #0077ff 100%);
+      background: linear-gradient(135deg, #00d2ff 0%, #0066ff 100%);
       color: #fff;
       border: none;
-      padding: 12px 28px;
+      padding: 13px 32px;
       font-size: 1rem;
       font-weight: 700;
-      letter-spacing: 1.5px;
+      letter-spacing: 2px;
       border-radius: 6px;
       cursor: pointer;
-      box-shadow: 0 0 15px rgba(0, 210, 255, 0.5);
+      box-shadow: 0 0 18px rgba(0, 210, 255, 0.5);
       transition: all 0.2s ease;
     }
     .action-btn:hover {
-      transform: scale(1.04);
-      box-shadow: 0 0 25px rgba(0, 210, 255, 0.8);
+      transform: scale(1.03);
+      box-shadow: 0 0 28px rgba(0, 210, 255, 0.8);
     }
     #status-pill {
       margin-top: 15px;
       font-size: 0.8rem;
       color: #38ef7d;
-    }
-    #holo-loader {
-      position: fixed;
-      left: 16px;
-      bottom: 16px;
-      z-index: 10;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 16px;
-      border: 1px solid rgba(0, 240, 255, 0.45);
-      border-radius: 8px;
-      background: rgba(4, 12, 22, 0.9);
-      box-shadow: 0 0 20px rgba(0, 210, 255, 0.16);
-      font-size: 0.78rem;
-    }
-    #holo-image-input {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-    }
-    #holo-loader label,
-    #restore-armor {
-      border: 1px solid rgba(0, 240, 255, 0.6);
-      border-radius: 5px;
-      padding: 8px 10px;
-      color: #8be4fc;
-      background: rgba(0, 100, 140, 0.2);
-      cursor: pointer;
-      font: inherit;
-    }
-    #holo-status {
-      color: #b7cad5;
-      max-width: 260px;
-    }
-    @media (max-width: 600px) {
-      #holo-loader {
-        left: 8px;
-        right: 8px;
-        bottom: 8px;
-        flex-wrap: wrap;
-      }
-      #holo-status {
-        max-width: none;
-      }
     }
   </style>
 
@@ -120,81 +72,416 @@
   </script>
 </head>
 <body>
-  <div id="launch-overlay">
-    <h1>Stark Malibu Lab</h1>
+  <div id="init-overlay">
+    <h1>STARK INDUSTRIES // HALL OF ARMOR</h1>
     <p>
-      Click below to initialize the <strong>3D Spatial Audio Engine & J.A.R.V.I.S.</strong>, then put on your Quest 3 and enter VR.
+      Click below to authorize <strong>J.A.R.V.I.S.</strong> and spatial audio. Sit comfortably, put on your Quest 3, and enter VR.
     </p>
-    <button class="action-btn" id="init-btn">INITIALIZE AUDIO & VR</button>
-    <div id="status-pill">Awaiting authorization...</div>
-  </div>
-  <div id="holo-loader">
-    <label for="holo-image-input">LOAD HOLOGRAM IMAGE</label>
-    <input id="holo-image-input" type="file" accept="image/*" capture="environment" aria-label="Capture or load a hologram image" />
-    <button id="restore-armor" type="button">RESTORE ARMOR</button>
-    <span id="holo-status" aria-live="polite">Articulated armor ready. In VR, say “wave”, “pose”, “walk”, or “neutral”.</span>
+    <button class="action-btn" id="init-btn">INITIALIZE LABORATORY</button>
+    <div id="status-pill">Ready to initialize...</div>
   </div>
 
   <script type="module">
     import * as THREE from 'three';
     import { VRButton } from 'three/addons/webxr/VRButton.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+    import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
     import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
     // -------------------------------------------------------------
-    // 1. SCENE SETUP & RENDERER
+    // 1. RENDERER & CINEMATIC PBR TONEMAPPING
     // -------------------------------------------------------------
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050a12);
-    scene.fog = new THREE.FogExp2(0x050a12, 0.035);
+    scene.background = new THREE.Color(0x020408);
+    scene.fog = new THREE.FogExp2(0x020408, 0.028);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.xr.enabled = true;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.body.appendChild(renderer.domElement);
-    const environmentGenerator = new THREE.PMREMGenerator(renderer);
-    scene.environment = environmentGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
-    environmentGenerator.dispose();
-
-    const roomLight = new THREE.HemisphereLight(0x8bdfff, 0x101522, 1.15);
-    scene.add(roomLight);
-
-    const keyLight = new THREE.DirectionalLight(0xe5f5ff, 1.6);
-    keyLight.position.set(-5, 9, 5);
-    keyLight.castShadow = true;
-    keyLight.shadow.mapSize.set(1024, 1024);
-    keyLight.shadow.camera.left = -13;
-    keyLight.shadow.camera.right = 13;
-    keyLight.shadow.camera.top = 8;
-    keyLight.shadow.camera.bottom = -3;
-    scene.add(keyLight);
 
     // -------------------------------------------------------------
-    // 2. PLAYER RIG & 3D AUDIO LISTENER
+    // 2. SEATED CAMERA RIG & AUDIO LISTENER
     // -------------------------------------------------------------
     const cameraRig = new THREE.Group();
-    cameraRig.position.set(0, 0, 1.8);
+    cameraRig.position.set(0, 0, 1.35); // Ergonomic seated distance to table
     scene.add(cameraRig);
 
     const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 50);
     cameraRig.add(camera);
 
-    // Attach Three.js AudioListener to the user's head
     const audioListener = new THREE.AudioListener();
     camera.add(audioListener);
-
-    // -------------------------------------------------------------
-    // 3. PROCEDURAL SOUND SYNTHESIS ENGINE (No External MP3s Needed)
-    // -------------------------------------------------------------
     const audioCtx = audioListener.context;
 
-    // Buffer 1: Futuristic Tablet UI Chime
+    // -------------------------------------------------------------
+    // 2A. POST-PROCESSING: SUBTLE BLOOM FOR EMISSIVES
+    // -------------------------------------------------------------
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.5,   // strength — subtle, only emissives should glow
+      0.55,  // radius
+      0.72   // luminance threshold — keeps lit surfaces clean
+    );
+    composer.addPass(bloomPass);
+    composer.addPass(new OutputPass());
+
+    // -------------------------------------------------------------
+    // 3. ENVIRONMENT LIGHTING & SHADOWS (PBR needs reflections)
+    // -------------------------------------------------------------
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
+
+    const hemi = new THREE.HemisphereLight(0x8bdfff, 0x0a0e16, 0.5);
+    scene.add(hemi);
+
+    const keyLight = new THREE.DirectionalLight(0xeaf6ff, 1.2);
+    keyLight.position.set(-4, 8, 5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -10;
+    keyLight.shadow.camera.right = 10;
+    keyLight.shadow.camera.top = 10;
+    keyLight.shadow.camera.bottom = -10;
+    keyLight.shadow.camera.near = 1;
+    keyLight.shadow.camera.far = 25;
+    keyLight.shadow.bias = -0.0004;
+    scene.add(keyLight);
+
+    // -------------------------------------------------------------
+    // 4. PBR MATERIALS
+    // -------------------------------------------------------------
+    const materials = {
+      gunmetal: new THREE.MeshStandardMaterial({ color: 0x23272e, metalness: 0.85, roughness: 0.35 }),
+      arcWhite: new THREE.MeshBasicMaterial({ color: 0xffffff }),
+      glossFloor: new THREE.MeshStandardMaterial({ color: 0x05080f, metalness: 0.85, roughness: 0.08 }),
+      alcoveWall: new THREE.MeshStandardMaterial({ color: 0x141a24, metalness: 0.7, roughness: 0.5 }),
+      lightPillar: new THREE.MeshBasicMaterial({ color: 0xffffff })
+    };
+
+    // Distinct liveries so all 7 bays look stocked, not copy-pasted
+    const SUIT_PALETTES = [
+      { crimson: 0x8f1626, gold: 0xc9a227 }, // hot-rod classic
+      { crimson: 0xb9c1c9, gold: 0x77808a }, // silver prototype
+      { crimson: 0x7a1f2b, gold: 0xb9c1c9 }, // red / silver
+      { crimson: 0x9b111e, gold: 0xd4af37 }, // HERO (center bay)
+      { crimson: 0x2b3a55, gold: 0xd4af37 }, // stealth blue / gold
+      { crimson: 0x3a3f44, gold: 0xb58a43 }, // gunmetal / bronze
+      { crimson: 0x5c1a1a, gold: 0xe0c070 }  // deep crimson / pale gold
+    ];
+
+    // -------------------------------------------------------------
+    // 5. HALL OF ARMOR: CURVED BACK WALL WITH 7 ALCOVES
+    // -------------------------------------------------------------
+    const ALCOVE_COUNT = 7;
+    const ARC_RADIUS = 6.2;
+    const ARC_SPREAD = 0.9;
+    const alcoveCenters = [];
+
+    const floor = new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 0.4, 48), materials.glossFloor);
+    floor.position.y = -0.2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    const canopyCurve = new THREE.Mesh(
+      new THREE.TorusGeometry(ARC_RADIUS, 0.25, 12, 48, ARC_SPREAD),
+      materials.gunmetal
+    );
+    canopyCurve.rotation.x = Math.PI / 2;
+    canopyCurve.rotation.z = Math.PI / 2 - ARC_SPREAD / 2;
+    canopyCurve.position.set(0, 4.4, -1.8);
+    scene.add(canopyCurve);
+
+    for (let i = 0; i < ALCOVE_COUNT; i++) {
+      const t = (i / (ALCOVE_COUNT - 1)) - 0.5;
+      const angle = t * ARC_SPREAD;
+      const x = Math.sin(angle) * ARC_RADIUS;
+      const z = -Math.cos(angle) * ARC_RADIUS + 2.5;
+
+      const alcoveGroup = new THREE.Group();
+      alcoveGroup.position.set(x, 0, z);
+      alcoveGroup.rotation.y = angle;
+
+      const backPlate = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3.8, 0.1), materials.alcoveWall);
+      backPlate.position.set(0, 1.9, -0.6);
+      alcoveGroup.add(backPlate);
+
+      for (let y = 0.4; y < 3.6; y += 0.3) {
+        const louver = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.04, 0.08), materials.gunmetal);
+        louver.position.set(0, y, -0.54);
+        alcoveGroup.add(louver);
+      }
+
+      const leftPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3.8, 16), materials.lightPillar);
+      leftPillar.position.set(-0.75, 1.9, 0);
+      const rightPillar = leftPillar.clone();
+      rightPillar.position.x = 0.75;
+      alcoveGroup.add(leftPillar, rightPillar);
+
+      const basePlatform = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.12, 1.1), materials.gunmetal);
+      basePlatform.position.set(0, 0.06, 0);
+      basePlatform.receiveShadow = true;
+      alcoveGroup.add(basePlatform);
+
+      const spotLight = new THREE.SpotLight(0xffeaad, 3.5, 7.5, Math.PI / 6, 0.4, 1.2);
+      spotLight.position.set(0, 4.2, 0.2);
+      spotLight.target.position.set(0, 1.2, 0);
+      alcoveGroup.add(spotLight);
+      alcoveGroup.add(spotLight.target);
+
+      const uplight = new THREE.PointLight(0xffffff, 0.6, 2.5);
+      uplight.position.set(0, 0.3, 0.2);
+      alcoveGroup.add(uplight);
+
+      scene.add(alcoveGroup);
+      alcoveCenters.push({ group: alcoveGroup, position: new THREE.Vector3(x, 0.12, z), rotation: angle });
+    }
+
+    // -------------------------------------------------------------
+    // 6. SEGMENTED ARMOR CREATOR (Physical or Holographic)
+    // -------------------------------------------------------------
+    function createSegmentedArmor(isHologram = false, palette = SUIT_PALETTES[3]) {
+      const root = new THREE.Group();
+
+      let matCrimson = new THREE.MeshStandardMaterial({ color: palette.crimson, metalness: 0.92, roughness: 0.18 });
+      let matGold = new THREE.MeshStandardMaterial({ color: palette.gold, metalness: 0.95, roughness: 0.22 });
+      let matCore = materials.arcWhite;
+
+      if (isHologram) {
+        const holoMat = (colorHex, op = 0.7) => new THREE.MeshStandardMaterial({
+          color: colorHex,
+          emissive: colorHex,
+          emissiveIntensity: 0.65,
+          roughness: 0.1,
+          metalness: 0.9,
+          transparent: true,
+          opacity: op
+        });
+        matCrimson = holoMat(0x00f0ff, 0.65);
+        matGold = holoMat(0xffd700, 0.75);
+        matCore = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      }
+
+      // Helmet
+      const helmetGroup = new THREE.Group();
+      helmetGroup.position.set(0, 1.62, 0);
+
+      const skull = new THREE.Mesh(new THREE.SphereGeometry(0.12, 24, 24), matCrimson);
+      skull.scale.set(0.9, 1.05, 1.0);
+      helmetGroup.add(skull);
+
+      const jawL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.09, 0.14), matGold);
+      jawL.position.set(-0.075, -0.04, 0.04);
+      jawL.rotation.y = 0.2;
+      const jawR = jawL.clone();
+      jawR.position.x = 0.075;
+      jawR.rotation.y = -0.2;
+      helmetGroup.add(jawL, jawR);
+
+      // Actuating Faceplate
+      const faceplateGroup = new THREE.Group();
+      faceplateGroup.position.set(0, 0.01, 0.08);
+
+      const brow = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.04, 0.06), matGold);
+      brow.position.set(0, 0.045, 0.02);
+      brow.rotation.x = -0.2;
+
+      const noseCheeks = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.05), matGold);
+      noseCheeks.position.set(0, -0.01, 0.03);
+
+      const eyeGeo = new THREE.BoxGeometry(0.035, 0.008, 0.02);
+      const eyeL = new THREE.Mesh(eyeGeo, matCore);
+      eyeL.position.set(-0.035, 0.025, 0.052);
+      eyeL.rotation.z = -0.15;
+      const eyeR = new THREE.Mesh(eyeGeo, matCore);
+      eyeR.position.set(0.035, 0.025, 0.052);
+      eyeR.rotation.z = 0.15;
+
+      faceplateGroup.add(brow, noseCheeks, eyeL, eyeR);
+      helmetGroup.add(faceplateGroup);
+      root.add(helmetGroup);
+
+      // Torso
+      const torsoGroup = new THREE.Group();
+      torsoGroup.position.set(0, 1.25, 0);
+
+      const upperChest = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.26, 0.22), matCrimson);
+      upperChest.position.set(0, 0.12, 0);
+
+      const reactorRing = new THREE.Mesh(new THREE.RingGeometry(0.035, 0.05, 32), matGold);
+      reactorRing.position.set(0, 0.13, 0.135);
+      const reactorCore = new THREE.Mesh(new THREE.CircleGeometry(0.032, 32), matCore);
+      reactorCore.position.set(0, 0.13, 0.136);
+
+      const abs = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.22, 0.18), matGold);
+      abs.position.set(0, -0.1, 0);
+
+      torsoGroup.add(upperChest, reactorRing, reactorCore, abs);
+      root.add(torsoGroup);
+
+      // Arms
+      const armL = new THREE.Group();
+      armL.position.set(-0.25, 1.35, 0);
+      const pauldronL = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 16), matCrimson);
+      pauldronL.scale.set(1.1, 0.7, 0.9);
+      const bicepL = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.22, 16), matGold);
+      bicepL.position.y = -0.14;
+      const gauntletL = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.24, 16), matCrimson);
+      gauntletL.position.y = -0.34;
+      armL.add(pauldronL, bicepL, gauntletL);
+
+      const armR = new THREE.Group();
+      armR.position.set(0.25, 1.35, 0);
+      const pauldronR = pauldronL.clone();
+      const bicepR = bicepL.clone();
+      const gauntletR = gauntletL.clone();
+      armR.add(pauldronR, bicepR, gauntletR);
+      root.add(armL, armR);
+
+      // Legs
+      const legL = new THREE.Group();
+      legL.position.set(-0.11, 0.9, 0);
+      const thighL = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.05, 0.36, 16), matCrimson);
+      thighL.position.y = -0.16;
+      const calfL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.055, 0.38, 16), matGold);
+      calfL.position.y = -0.48;
+      const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.09, 0.19), matCrimson);
+      bootL.position.set(0, -0.71, 0.04);
+      legL.add(thighL, calfL, bootL);
+
+      const legR = new THREE.Group();
+      legR.position.set(0.11, 0.9, 0);
+      const thighR = thighL.clone();
+      const calfR = calfL.clone();
+      const bootR = bootL.clone();
+      legR.add(thighR, calfR, bootR);
+      root.add(legL, legR);
+
+      return { root, faceplate: faceplateGroup, helmet: helmetGroup, torso: torsoGroup, armL, armR, legL, legR };
+    }
+
+    // Populate ALL 7 alcoves with unique liveries — no empty bays
+    const alcoveSuits = [];
+    alcoveCenters.forEach((bay, i) => {
+      const suit = createSegmentedArmor(false, SUIT_PALETTES[i]);
+      suit.root.position.copy(bay.position);
+      suit.root.rotation.y = bay.rotation;
+      suit.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      scene.add(suit.root);
+      alcoveSuits.push(suit);
+    });
+
+    const bay3Data = alcoveCenters[3];
+    const heroSuit = alcoveSuits[3];
+
+    // Auto-replace hero suit with suit.glb if uploaded to your repository
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.load('./suit.glb', (gltf) => {
+      scene.remove(heroSuit.root);
+      const loaded = gltf.scene;
+      loaded.position.copy(bay3Data.position);
+      loaded.rotation.y = bay3Data.rotation;
+      loaded.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      scene.add(loaded);
+    }, undefined, () => {});
+
+    // DamagedHelmet display piece on a pedestal beside the workbench
+    const helmetPedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 0.9, 24), materials.gunmetal);
+    helmetPedestal.position.set(1.05, 0.57, 0.55);
+    helmetPedestal.castShadow = true;
+    scene.add(helmetPedestal);
+
+    const helmetAnchor = new THREE.Group();
+    helmetAnchor.position.set(1.05, 1.06, 0.55);
+    scene.add(helmetAnchor);
+
+    gltfLoader.load(
+      'https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/models/gltf/DamagedHelmet/glTF-Binary/DamagedHelmet.glb',
+      (gltf) => {
+        const helmet = gltf.scene;
+        helmet.scale.setScalar(0.28);
+        helmet.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+        helmetAnchor.add(helmet);
+      },
+      undefined,
+      (error) => console.error('Helmet failed to load:', error)
+    );
+
+    // -------------------------------------------------------------
+    // 7. CENTRAL GANTRY WORKBENCH (0.85m Seated Height) + HUM
+    // -------------------------------------------------------------
+    const workbenchGroup = new THREE.Group();
+    workbenchGroup.position.set(0, 0, 0);
+
+    const gantryBase = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.7, 0.12, 48), materials.gunmetal);
+    gantryBase.position.y = 0.06;
+    gantryBase.receiveShadow = true;
+    workbenchGroup.add(gantryBase);
+
+    const holotableTop = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.95, 0.08, 32), materials.gunmetal);
+    holotableTop.position.y = 0.85;
+    workbenchGroup.add(holotableTop);
+
+    const emitterRing = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.46, 32), new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide }));
+    emitterRing.rotation.x = -Math.PI / 2;
+    emitterRing.position.y = 0.892;
+    workbenchGroup.add(emitterRing);
+
+    const holoLight = new THREE.PointLight(0x00f0ff, 2.8, 3.5);
+    holoLight.position.set(0, 1.1, 0);
+    workbenchGroup.add(holoLight);
+
+    // 3D Spatial Audio: continuous holotable hum
+    const tableAudio = new THREE.PositionalAudio(audioListener);
+    tableAudio.setRefDistance(1.2);
+    tableAudio.setMaxDistance(12);
+    tableAudio.setRolloffFactor(1.5);
+    workbenchGroup.add(tableAudio);
+
+    scene.add(workbenchGroup);
+
+    // -------------------------------------------------------------
+    // 8. HOLOGRAPHIC SUIT RIG (Floating at Chest Level)
+    // -------------------------------------------------------------
+    const holoRig = new THREE.Group();
+    let holoBaseY = 0.95;
+    holoRig.position.set(0, holoBaseY, 0);
+    holoRig.scale.setScalar(0.65);
+    scene.add(holoRig);
+
+    const holoSuit = createSegmentedArmor(true);
+    holoRig.add(holoSuit.root);
+
+    const gimbalRing1 = new THREE.Mesh(
+      new THREE.RingGeometry(0.48, 0.49, 48),
+      new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide, transparent: true, opacity: 0.4 })
+    );
+    gimbalRing1.rotation.x = Math.PI / 2;
+    holoRig.add(gimbalRing1);
+
+    // Positional servo/surge emitter on the hologram
+    const servoAudio = new THREE.PositionalAudio(audioListener);
+    servoAudio.setRefDistance(1.0);
+    servoAudio.setMaxDistance(10);
+    servoAudio.setRolloffFactor(1.6);
+    holoRig.add(servoAudio);
+
+    // -------------------------------------------------------------
+    // 9. PROCEDURAL SOUND SYNTHESIS ENGINE (No External MP3s Needed)
+    // -------------------------------------------------------------
     function createChimeBuffer() {
       const sampleRate = audioCtx.sampleRate;
       const duration = 0.22;
@@ -203,44 +490,41 @@
       for (let i = 0; i < buffer.length; i++) {
         const t = i / sampleRate;
         const env = Math.exp(-t * 22);
-        // Dual-harmonic chime: 1174Hz (D6) + 1760Hz (A6)
         data[i] = (Math.sin(2 * Math.PI * 1174 * t) * 0.6 + Math.sin(2 * Math.PI * 1760 * t) * 0.4) * env;
       }
       return buffer;
     }
 
-    // Buffer 2: Heavy 60Hz Plasma Torch Energy Buzz (Loopable)
-    function createPlasmaBuzzBuffer() {
+    function createSurgeBuffer() {
       const sampleRate = audioCtx.sampleRate;
       const duration = 1.0;
       const buffer = audioCtx.createBuffer(1, sampleRate * duration, sampleRate);
       const data = buffer.getChannelData(0);
       for (let i = 0; i < buffer.length; i++) {
         const t = i / sampleRate;
+        const env = Math.exp(-t * 4);
         const sub = Math.sin(2 * Math.PI * 62 * t) * 0.5;
         const harmonic = Math.sin(2 * Math.PI * 124 * t) * 0.3;
         const hiss = (Math.random() * 2 - 1) * 0.2;
-        data[i] = (sub + harmonic + hiss) * 0.6;
+        data[i] = (sub + harmonic + hiss) * 0.6 * env;
       }
       return buffer;
     }
 
-    // Buffer 3: Plasma Torch Ignition Pop
-    function createIgniteBuffer() {
+    function createServoBuffer() {
       const sampleRate = audioCtx.sampleRate;
       const duration = 0.15;
       const buffer = audioCtx.createBuffer(1, sampleRate * duration, sampleRate);
       const data = buffer.getChannelData(0);
       for (let i = 0; i < buffer.length; i++) {
         const t = i / sampleRate;
-        const freq = 420 - t * 1800; // Rapid downward frequency sweep
+        const freq = 420 - t * 1800;
         const env = Math.exp(-t * 28);
         data[i] = Math.sin(2 * Math.PI * Math.max(freq, 40) * t) * env * 0.8;
       }
       return buffer;
     }
 
-    // Buffer 4: Magnetic Metallic Snap (Grabbing Objects)
     function createGrabBuffer() {
       const sampleRate = audioCtx.sampleRate;
       const duration = 0.08;
@@ -254,7 +538,6 @@
       return buffer;
     }
 
-    // Buffer 5: Continuous Holographic Table Ambient Hum
     function createHoloHumBuffer() {
       const sampleRate = audioCtx.sampleRate;
       const duration = 2.0;
@@ -262,963 +545,196 @@
       const data = buffer.getChannelData(0);
       for (let i = 0; i < buffer.length; i++) {
         const t = i / sampleRate;
-        const hum = Math.sin(2 * Math.PI * 110 * t) * 0.08;
-        const harmonic = Math.sin(2 * Math.PI * 220 * t) * 0.03;
-        data[i] = hum + harmonic;
+        data[i] = Math.sin(2 * Math.PI * 110 * t) * 0.08 + Math.sin(2 * Math.PI * 220 * t) * 0.03;
       }
       return buffer;
     }
 
-    let bufChime, bufPlasma, bufIgnite, bufGrab, bufHoloHum;
+    let bufChime, bufSurge, bufServo, bufGrab, bufHoloHum;
     function initBuffers() {
       bufChime = createChimeBuffer();
-      bufPlasma = createPlasmaBuzzBuffer();
-      bufIgnite = createIgniteBuffer();
+      bufSurge = createSurgeBuffer();
+      bufServo = createServoBuffer();
       bufGrab = createGrabBuffer();
       bufHoloHum = createHoloHumBuffer();
     }
 
-    // -------------------------------------------------------------
-    // 4. ARCHITECTURE & LAB ENVIRONMENT
-    // -------------------------------------------------------------
-    const materials = {
-      polishedFloor: new THREE.MeshStandardMaterial({ color: 0x111620, roughness: 0.15, metalness: 0.8 }),
-      wallConcrete: new THREE.MeshStandardMaterial({ color: 0x1a222e, roughness: 0.8 }),
-      brushedMetal: new THREE.MeshStandardMaterial({ color: 0x222a38, metalness: 0.9, roughness: 0.2 }),
-      cyanGlow: new THREE.MeshBasicMaterial({ color: 0x00f0ff }),
-      glass: new THREE.MeshPhysicalMaterial({ color: 0x88ccff, transparent: true, opacity: 0.35, transmission: 0.8, roughness: 0.1 }),
-      cautionStripe: new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.5 })
-    };
-
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(24, 0.4, 20), materials.polishedFloor);
-    floor.position.y = -0.2;
-    floor.receiveShadow = true;
-    scene.add(floor);
-
-    const floorRing = new THREE.Mesh(
-      new THREE.RingGeometry(2.4, 2.45, 64),
-      new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide, transparent: true, opacity: 0.3 })
-    );
-    floorRing.rotation.x = Math.PI / 2;
-    floorRing.position.y = 0.005;
-    scene.add(floorRing);
-
-    const backWall = new THREE.Mesh(new THREE.BoxGeometry(24, 6, 0.6), materials.wallConcrete);
-    backWall.position.set(0, 3, -8);
-    scene.add(backWall);
-
-    for (let x = -8; x <= 8; x += 4) {
-      const beam = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.6, 20), materials.brushedMetal);
-      beam.position.set(x, 5.7, 0);
-      scene.add(beam);
-    }
-
-    const ceilingLights = [];
-    for (const x of [-8, -4, 0, 4, 8]) {
-      for (const z of [-5, 2, 7]) {
-        const fixture = new THREE.Mesh(
-          new THREE.BoxGeometry(2.5, 0.06, 0.28),
-          new THREE.MeshBasicMaterial({ color: 0x8be4fc })
-        );
-        fixture.position.set(x, 5.35, z);
-        scene.add(fixture);
-
-        if (z === 2 && x % 8 === 0) {
-          const light = new THREE.PointLight(0x63dfff, 1.8, 10);
-          light.position.set(x, 5.05, z);
-          scene.add(light);
-          ceilingLights.push(light);
-        }
-      }
-    }
-
-    for (const x of [-10.8, 10.8]) {
-      const strip = new THREE.Mesh(
-        new THREE.BoxGeometry(0.08, 4.8, 0.12),
-        new THREE.MeshBasicMaterial({ color: 0x00d2ff })
-      );
-      strip.position.set(x, 2.7, -1);
-      scene.add(strip);
+    function playPositional(audio, buffer) {
+      if (!buffer) return;
+      if (audio.isPlaying) audio.stop();
+      audio.setBuffer(buffer);
+      audio.play();
     }
 
     // -------------------------------------------------------------
-    // 4A. PROTOTYPE VEHICLE BAYS
+    // 10. INTERACTIVE HOLOGRAPHIC HUD & TACTICAL TERMINAL
     // -------------------------------------------------------------
-    const vehiclePaints = [0x861d2b, 0x183047];
-    const vehicleLights = [];
-
-    function createPrototypeCar(paintColor, position, bayLabel) {
-      const car = new THREE.Group();
-      car.position.copy(position);
-
-      const paint = new THREE.MeshStandardMaterial({
-        color: paintColor,
-        metalness: 0.72,
-        roughness: 0.24,
-        clearcoat: 1,
-        clearcoatRoughness: 0.12
-      });
-      const darkGlass = new THREE.MeshPhysicalMaterial({
-        color: 0x162b38,
-        metalness: 0.35,
-        roughness: 0.08,
-        transmission: 0.35,
-        transparent: true,
-        opacity: 0.96,
-        clearcoat: 1
-      });
-      const tire = new THREE.MeshStandardMaterial({ color: 0x101215, roughness: 0.78 });
-      const alloy = new THREE.MeshStandardMaterial({ color: 0x9ba9b4, metalness: 0.94, roughness: 0.2 });
-      const chrome = new THREE.MeshStandardMaterial({ color: 0x657783, metalness: 0.92, roughness: 0.22 });
-      const headlampMaterial = new THREE.MeshPhysicalMaterial({
-        color: 0xdaf7ff,
-        emissive: 0x5dcfff,
-        emissiveIntensity: 1.4,
-        roughness: 0.12
-      });
-      const rearLampMaterial = new THREE.MeshBasicMaterial({ color: 0xff173e });
-
-      const bay = new THREE.Mesh(
-        new THREE.BoxGeometry(3.2, 0.035, 5.8),
-        new THREE.MeshStandardMaterial({ color: 0x101c2a, metalness: 0.45, roughness: 0.55 })
-      );
-      bay.position.y = 0.02;
-      bay.receiveShadow = true;
-      car.add(bay);
-
-      function addLoft(stations, material, segments = 32) {
-        const vertices = [];
-        const indices = [];
-        const steps = (stations.length - 1) * 8;
-        function interpolate(key, index, t) {
-          const before = stations[Math.max(index - 1, 0)][key];
-          const start = stations[index][key];
-          const end = stations[index + 1][key];
-          const after = stations[Math.min(index + 2, stations.length - 1)][key];
-          const t2 = t * t;
-          const t3 = t2 * t;
-          return 0.5 * (
-            2 * start +
-            (-before + end) * t +
-            (2 * before - 5 * start + 4 * end - after) * t2 +
-            (-before + 3 * start - 3 * end + after) * t3
-          );
-        }
-
-        for (let step = 0; step <= steps; step++) {
-          const along = (step / steps) * (stations.length - 1);
-          const index = Math.min(Math.floor(along), stations.length - 2);
-          const t = along - index;
-          const z = THREE.MathUtils.lerp(stations[index].z, stations[index + 1].z, t);
-          const width = interpolate('width', index, t);
-          const lower = interpolate('lower', index, t);
-          const upper = interpolate('upper', index, t);
-          for (let segment = 0; segment <= segments; segment++) {
-            const angle = (segment / segments) * Math.PI * 2;
-            vertices.push(
-              Math.cos(angle) * width,
-              (lower + upper) * 0.5 + Math.sin(angle) * (upper - lower) * 0.5,
-              z
-            );
-          }
-        }
-        for (let step = 0; step < steps; step++) {
-          for (let segment = 0; segment < segments; segment++) {
-            const a = step * (segments + 1) + segment;
-            const b = a + segments + 1;
-            indices.push(a, a + 1, b, b, a + 1, b + 1);
-          }
-        }
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        geometry.setIndex(indices);
-        geometry.computeVertexNormals();
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        car.add(mesh);
-        return mesh;
-      }
-
-      addLoft([
-        { z: -2.52, width: 0.5, lower: 0.43, upper: 0.66 },
-        { z: -2.28, width: 0.77, lower: 0.35, upper: 0.76 },
-        { z: -1.75, width: 0.9, lower: 0.31, upper: 0.84 },
-        { z: -1.2, width: 0.94, lower: 0.3, upper: 0.87 },
-        { z: -0.5, width: 0.93, lower: 0.3, upper: 0.84 },
-        { z: 0.55, width: 0.94, lower: 0.3, upper: 0.85 },
-        { z: 1.35, width: 0.92, lower: 0.31, upper: 0.87 },
-        { z: 2.1, width: 0.8, lower: 0.35, upper: 0.76 },
-        { z: 2.48, width: 0.52, lower: 0.43, upper: 0.64 }
-      ], paint);
-
-      addLoft([
-        { z: -1.18, width: 0.69, lower: 0.78, upper: 0.82 },
-        { z: -0.88, width: 0.69, lower: 0.81, upper: 1.13 },
-        { z: -0.42, width: 0.65, lower: 0.82, upper: 1.43 },
-        { z: 0.18, width: 0.62, lower: 0.82, upper: 1.48 },
-        { z: 0.72, width: 0.64, lower: 0.82, upper: 1.34 },
-        { z: 1.12, width: 0.69, lower: 0.79, upper: 0.91 }
-      ], darkGlass, 24);
-
-      for (const side of [-1, 1]) {
-        const windowTrim = new THREE.Mesh(
-          new THREE.TorusGeometry(0.48, 0.018, 8, 36, Math.PI),
-          chrome
-        );
-        windowTrim.rotation.z = Math.PI / 2;
-        windowTrim.rotation.y = side * 0.08;
-        windowTrim.position.set(side * 0.69, 0.96, -0.03);
-        car.add(windowTrim);
-
-        for (const z of [-1.42, 1.42]) {
-          const wheelArch = new THREE.Mesh(
-            new THREE.TorusGeometry(0.39, 0.045, 10, 40, Math.PI),
-            paint
-          );
-          wheelArch.rotation.y = Math.PI / 2;
-          wheelArch.position.set(side * 0.89, 0.38, z);
-          car.add(wheelArch);
-
-          const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.095, 12, 32), tire);
-          wheel.rotation.y = Math.PI / 2;
-          wheel.position.set(side * 0.91, 0.38, z);
-          wheel.castShadow = true;
-          car.add(wheel);
-
-          const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.235, 0.235, 0.12, 32), alloy);
-          rim.rotation.z = Math.PI / 2;
-          rim.position.set(side * 0.91, 0.38, z);
-          car.add(rim);
-
-          const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.14, 20), chrome);
-          hub.rotation.z = Math.PI / 2;
-          hub.position.set(side * 0.91, 0.38, z);
-          car.add(hub);
-
-          for (let spoke = 0; spoke < 10; spoke++) {
-            const angle = (spoke / 10) * Math.PI * 2;
-            const spokeMesh = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.18, 0.035), chrome);
-            spokeMesh.position.set(
-              side * 0.98,
-              0.38 + Math.sin(angle) * 0.13,
-              z + Math.cos(angle) * 0.13
-            );
-            spokeMesh.rotation.x = -angle;
-            car.add(spokeMesh);
-          }
-        }
-
-        const mirror = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 12), paint);
-        mirror.scale.set(0.7, 0.55, 1.2);
-        mirror.position.set(side * 0.89, 0.95, -0.85);
-        car.add(mirror);
-      }
-
-      for (const x of [-0.62, 0.62]) {
-        const headlamp = new THREE.Mesh(new THREE.SphereGeometry(0.14, 20, 12), headlampMaterial);
-        headlamp.scale.set(1.35, 0.45, 0.18);
-        headlamp.position.set(x, 0.67, -2.27);
-        car.add(headlamp);
-
-        const tailLamp = new THREE.Mesh(new THREE.SphereGeometry(0.13, 20, 12), rearLampMaterial);
-        tailLamp.scale.set(1.4, 0.45, 0.18);
-        tailLamp.position.set(x, 0.68, 2.24);
-        car.add(tailLamp);
-      }
-
-      const frontGrille = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.025, 24), chrome);
-      frontGrille.rotation.x = Math.PI / 2;
-      frontGrille.position.set(0, 0.51, -2.45);
-      car.add(frontGrille);
-
-      const splitter = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.045, 0.22), chrome);
-      splitter.position.set(0, 0.34, -2.28);
-      car.add(splitter);
-
-      const rearDiffuser = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 0.18), chrome);
-      rearDiffuser.position.set(0, 0.35, 2.32);
-      car.add(rearDiffuser);
-
-      const sill = new THREE.Mesh(
-        new THREE.BoxGeometry(1.42, 0.045, 0.08),
-        new THREE.MeshStandardMaterial({ color: 0x687783, metalness: 0.9, roughness: 0.3 })
-      );
-      for (const side of [-1, 1]) {
-        const sideSill = sill.clone();
-        sideSill.position.set(side * 0.82, 0.38, 0);
-        car.add(sideSill);
-      }
-
-      const bayLight = new THREE.PointLight(0x00cfff, 2.4, 5);
-      bayLight.position.set(0, 1.1, 0);
-      car.add(bayLight);
-      vehicleLights.push(bayLight);
-
-      const spot = new THREE.SpotLight(0x8be4fc, 18, 13, Math.PI / 5, 0.65, 1.4);
-      spot.position.set(position.x, 5.1, position.z - 0.5);
-      spot.target.position.copy(position).add(new THREE.Vector3(0, 0.2, 0));
-      scene.add(spot, spot.target);
-
-      const labelCanvas = document.createElement('canvas');
-      labelCanvas.width = 512;
-      labelCanvas.height = 96;
-      const labelContext = labelCanvas.getContext('2d');
-      labelContext.fillStyle = 'rgba(4, 12, 22, 0.9)';
-      labelContext.fillRect(0, 0, labelCanvas.width, labelCanvas.height);
-      labelContext.strokeStyle = '#00d2ff';
-      labelContext.strokeRect(3, 3, labelCanvas.width - 6, labelCanvas.height - 6);
-      labelContext.fillStyle = '#8be4fc';
-      labelContext.font = 'bold 34px monospace';
-      labelContext.textAlign = 'center';
-      labelContext.textBaseline = 'middle';
-      labelContext.fillText(bayLabel, labelCanvas.width / 2, labelCanvas.height / 2);
-
-      const label = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.6, 0.3),
-        new THREE.MeshBasicMaterial({
-          map: new THREE.CanvasTexture(labelCanvas),
-          transparent: true,
-          side: THREE.DoubleSide
-        })
-      );
-      label.rotation.x = -Math.PI / 2;
-      label.position.set(0, 0.055, -2.65);
-      car.add(label);
-
-      scene.add(car);
-    }
-
-    createPrototypeCar(vehiclePaints[0], new THREE.Vector3(-7.2, 0, -1.2), "MARK II // ROADSTER");
-    createPrototypeCar(vehiclePaints[1], new THREE.Vector3(7.2, 0, -1.2), "MARK III // GT");
-
-    // -------------------------------------------------------------
-    // 5. HALL OF ARMOR PODS
-    // -------------------------------------------------------------
-    for (let i = 0; i < 4; i++) {
-      const podGroup = new THREE.Group();
-      podGroup.position.set((i - 1.5) * 3.2, 0, -7.2);
-
-      const podFrame = new THREE.Mesh(new THREE.BoxGeometry(2.2, 4.0, 1.4), materials.brushedMetal);
-      podFrame.position.y = 2.0;
-      const podGlass = new THREE.Mesh(new THREE.BoxGeometry(2.0, 3.8, 0.05), materials.glass);
-      podGlass.position.set(0, 2.0, 0.7);
-
-      const podBase = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.9, 0.2, 32), materials.brushedMetal);
-      podBase.position.y = 0.1;
-
-      const uplight = new THREE.PointLight(0x00d2ff, 1.2, 4);
-      uplight.position.set(0, 0.4, 0);
-
-      const dummyArmor = new THREE.Group();
-      const suitMaterial = new THREE.MeshStandardMaterial({
-        color: [0x9c2925, 0x586878, 0x7e3328, 0x364d63][i],
-        metalness: 0.82,
-        roughness: 0.24,
-        clearcoat: 0.7,
-        clearcoatRoughness: 0.18
-      });
-      const suitGold = new THREE.MeshStandardMaterial({
-        color: 0xb58a43,
-        metalness: 0.86,
-        roughness: 0.25
-      });
-      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.72, 0.34), suitMaterial);
-      torso.position.y = 1.6;
-      const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.28, 0.3), suitMaterial);
-      pelvis.position.y = 1.08;
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), suitMaterial);
-      head.position.y = 2.15;
-      const arcGlow = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), materials.cyanGlow);
-      arcGlow.position.set(0, 1.7, 0.16);
-      const faceplate = new THREE.Mesh(new THREE.SphereGeometry(0.115, 16, 12), suitGold);
-      faceplate.scale.set(1.15, 0.5, 0.4);
-      faceplate.position.set(0, 2.15, 0.14);
-      dummyArmor.add(torso, pelvis, head, arcGlow, faceplate);
-
-      for (const side of [-1, 1]) {
-        const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12), side > 0 ? suitGold : suitMaterial);
-        shoulder.position.set(side * 0.4, 1.86, 0);
-        const upperArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.35, 6, 12), suitMaterial);
-        upperArm.position.set(side * 0.48, 1.55, 0);
-        upperArm.rotation.z = side * -0.08;
-        const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.32, 6, 12), side > 0 ? suitGold : suitMaterial);
-        forearm.position.set(side * 0.52, 1.17, 0.01);
-        const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.35, 6, 12), suitMaterial);
-        thigh.position.set(side * 0.16, 0.78, 0);
-        const shin = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.34, 6, 12), side > 0 ? suitGold : suitMaterial);
-        shin.position.set(side * 0.16, 0.36, 0);
-        const boot = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), suitMaterial);
-        boot.scale.set(0.85, 0.55, 1);
-        boot.position.set(side * 0.16, 0.1, 0.06);
-        dummyArmor.add(shoulder, upperArm, forearm, thigh, shin, boot);
-      }
-
-      podGroup.add(podBase, podGlass, uplight, dummyArmor);
-      scene.add(podGroup);
-    }
-
-    // -------------------------------------------------------------
-    // 6. THE CENTRAL STARK HOLOTABLE & SPATIAL HUM
-    // -------------------------------------------------------------
-    const tableGroup = new THREE.Group();
-    tableGroup.position.set(0, 0, 0);
-
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.5, 0.1, 8), materials.brushedMetal);
-    top.position.y = 0.95;
-    tableGroup.add(top);
-
-    const emitterRing = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.65, 48), materials.cyanGlow);
-    emitterRing.rotation.x = -Math.PI / 2;
-    emitterRing.position.y = 1.002;
-    tableGroup.add(emitterRing);
-
-    const holoLight = new THREE.PointLight(0x00f0ff, 2.5, 4);
-    holoLight.position.set(0, 1.2, 0);
-    tableGroup.add(holoLight);
-
-    const padTray = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.015, 0.28), materials.brushedMetal);
-    padTray.position.set(-0.65, 1.005, 0.2);
-    tableGroup.add(padTray);
-
-    const toolTray = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.015, 0.15), materials.brushedMetal);
-    toolTray.position.set(0.65, 1.005, 0.2);
-    tableGroup.add(toolTray);
-
-    // 3D Spatial Audio Emitter for the Holotable Projector
-    const tableAudio = new THREE.PositionalAudio(audioListener);
-    tableAudio.setRefDistance(1.2);
-    tableAudio.setMaxDistance(12);
-    tableAudio.setRolloffFactor(1.5);
-    tableGroup.add(tableAudio);
-
-    scene.add(tableGroup);
-
-    // -------------------------------------------------------------
-    // 7. DUM-E ROBOTIC ARM
-    // -------------------------------------------------------------
-    const dume = new THREE.Group();
-    dume.position.set(1.4, 1.0, -0.4);
-
-    const baseCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.15, 16), materials.cautionStripe);
-    dume.add(baseCyl);
-
-    const lowerArm = new THREE.Group();
-    lowerArm.position.y = 0.1;
-    const lowerMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.08), materials.brushedMetal);
-    lowerMesh.position.y = 0.25;
-    lowerArm.add(lowerMesh);
-    dume.add(lowerArm);
-
-    const upperArm = new THREE.Group();
-    upperArm.position.y = 0.5;
-    const upperMesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.45, 0.06), materials.brushedMetal);
-    upperMesh.position.y = 0.22;
-    upperArm.add(upperMesh);
-    lowerArm.add(upperArm);
-
-    const dunceCap = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.2, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-    dunceCap.position.set(0, 0.5, 0);
-    upperArm.add(dunceCap);
-    scene.add(dume);
-
-    // -------------------------------------------------------------
-    // 8. HOLOGRAPHIC MARK ARMOR ASSEMBLY
-    // -------------------------------------------------------------
-    const holoAssembly = new THREE.Group();
-    holoAssembly.position.set(0, 2.0, 0);
-    holoAssembly.scale.setScalar(0.62);
-
-    let holoColorHex = 0x00f0ff;
-    function makeHoloMat(opacity = 0.75, wireframe = true) {
-      return new THREE.MeshStandardMaterial({
-        color: holoColorHex,
-        emissive: holoColorHex,
-        emissiveIntensity: 0.6,
-        wireframe: wireframe,
-        transparent: true,
-        opacity: opacity,
-        roughness: 0.1,
-        metalness: 0.8
-      });
-    }
-
-    const arcCoreMat = makeHoloMat(0.9, false);
-    const arcCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.08, 2), arcCoreMat);
-    arcCore.position.set(0, 0.12, 0.2);
-
-    const ring1 = new THREE.Mesh(new THREE.RingGeometry(0.32, 0.33, 48), new THREE.MeshBasicMaterial({ color: holoColorHex, side: THREE.DoubleSide }));
-    ring1.rotation.x = Math.PI / 2;
-    ring1.position.y = 0.12;
-    const ring2 = new THREE.Mesh(new THREE.RingGeometry(0.38, 0.39, 48), new THREE.MeshBasicMaterial({ color: holoColorHex, side: THREE.DoubleSide }));
-    ring2.rotation.x = Math.PI / 2.2;
-    ring2.position.y = 0.12;
-
-    const armorFigure = new THREE.Group();
-    const armorSurfaceMat = new THREE.MeshStandardMaterial({
-      color: 0x9c2229,
-      emissive: 0x2d0910,
-      emissiveIntensity: 0.4,
-      metalness: 0.8,
-      roughness: 0.24,
-      transparent: true,
-      opacity: 0.84,
-      clearcoat: 1,
-      clearcoatRoughness: 0.16
-    });
-    const armorDetailMat = new THREE.MeshStandardMaterial({
-      color: 0xb58b47,
-      emissive: 0x291a08,
-      emissiveIntensity: 0.3,
-      metalness: 0.86,
-      roughness: 0.24,
-      transparent: true,
-      opacity: 0.9,
-      clearcoat: 0.8
-    });
-    const armorLineMat = new THREE.LineBasicMaterial({
-      color: 0x54edff,
-      transparent: true,
-      opacity: 0.46
-    });
-    function addArmorPiece(geometry, position, material = armorSurfaceMat, scale = null, parent = armorFigure) {
-      const piece = new THREE.Mesh(geometry, material);
-      piece.position.copy(position);
-      if (scale) piece.scale.copy(scale);
-      parent.add(piece);
-      const outline = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), armorLineMat);
-      outline.position.copy(position);
-      if (scale) outline.scale.copy(scale);
-      parent.add(outline);
-      return piece;
-    }
-
-    const suitCoreMat = new THREE.MeshBasicMaterial({ color: 0x9ffaff });
-    const torsoGroup = new THREE.Group();
-    armorFigure.add(torsoGroup);
-    addArmorPiece(new THREE.CapsuleGeometry(0.28, 0.42, 8, 16), new THREE.Vector3(0, 0.04, 0), armorSurfaceMat, new THREE.Vector3(1.1, 1, 0.72), torsoGroup);
-    addArmorPiece(new THREE.SphereGeometry(0.31, 24, 16), new THREE.Vector3(0, 0.14, 0.12), armorDetailMat, new THREE.Vector3(1, 0.46, 0.3), torsoGroup);
-    addArmorPiece(new THREE.BoxGeometry(0.44, 0.18, 0.12), new THREE.Vector3(0, -0.29, 0.12), armorDetailMat, new THREE.Vector3(1, 0.65, 1), torsoGroup);
-    addArmorPiece(new THREE.CylinderGeometry(0.095, 0.11, 0.15, 20), new THREE.Vector3(0, 0.39, 0), armorDetailMat, null, torsoGroup);
-
-    const pelvisGroup = new THREE.Group();
-    pelvisGroup.position.y = -0.4;
-    torsoGroup.add(pelvisGroup);
-    addArmorPiece(new THREE.SphereGeometry(0.25, 20, 14), new THREE.Vector3(0, -0.02, 0), armorSurfaceMat, new THREE.Vector3(1.1, 0.56, 0.78), pelvisGroup);
-    addArmorPiece(new THREE.BoxGeometry(0.32, 0.08, 0.25), new THREE.Vector3(0, 0.04, 0.09), armorDetailMat, null, pelvisGroup);
-
-    const helmetGroup = new THREE.Group();
-    helmetGroup.position.y = 0.57;
-    torsoGroup.add(helmetGroup);
-    const helmetGoldMat = new THREE.MeshStandardMaterial({
-      color: 0xb58b47,
-      emissive: 0x291a08,
-      emissiveIntensity: 0.3,
-      metalness: 0.86,
-      roughness: 0.24,
-      transparent: true,
-      opacity: 0.92,
-      clearcoat: 1
-    });
-    addArmorPiece(new THREE.SphereGeometry(0.19, 24, 18), new THREE.Vector3(0, 0.15, 0), armorSurfaceMat, new THREE.Vector3(0.92, 1.18, 0.92), helmetGroup);
-    addArmorPiece(new THREE.SphereGeometry(0.16, 24, 16), new THREE.Vector3(0, 0.1, 0.075), helmetGoldMat, new THREE.Vector3(0.9, 0.54, 0.67), helmetGroup);
-    const visor = new THREE.Mesh(
-      new THREE.BoxGeometry(0.19, 0.025, 0.025),
-      new THREE.MeshBasicMaterial({ color: 0x9ffaff })
-    );
-    visor.position.set(0, 0.19, 0.168);
-    helmetGroup.add(visor);
-
-    const chestCore = new THREE.Mesh(new THREE.SphereGeometry(0.085, 20, 16), suitCoreMat);
-    chestCore.position.set(0, 0.12, 0.235);
-    torsoGroup.add(chestCore);
-    const chestRing = new THREE.Mesh(
-      new THREE.TorusGeometry(0.092, 0.012, 8, 32),
-      new THREE.MeshBasicMaterial({ color: 0x9ffaff })
-    );
-    chestRing.position.copy(chestCore.position);
-    torsoGroup.add(chestRing);
-
-    const articulatedArms = [];
-    const articulatedLegs = [];
-
-    for (const side of [-1, 1]) {
-      const shoulder = new THREE.Group();
-      shoulder.position.set(side * 0.35, 0.27, 0);
-      torsoGroup.add(shoulder);
-      addArmorPiece(new THREE.SphereGeometry(0.19, 20, 16), new THREE.Vector3(0, -0.01, 0), armorDetailMat, new THREE.Vector3(1, 0.8, 0.9), shoulder);
-      addArmorPiece(new THREE.SphereGeometry(0.14, 16, 12), new THREE.Vector3(0, -0.15, 0), armorSurfaceMat, new THREE.Vector3(0.92, 1.2, 0.92), shoulder);
-
-      const upperArm = new THREE.Group();
-      upperArm.position.y = -0.2;
-      shoulder.add(upperArm);
-      addArmorPiece(new THREE.CapsuleGeometry(0.105, 0.27, 8, 14), new THREE.Vector3(0, -0.2, 0), armorSurfaceMat, new THREE.Vector3(1, 1, 0.85), upperArm);
-      addArmorPiece(new THREE.SphereGeometry(0.115, 16, 12), new THREE.Vector3(0, -0.4, 0), armorDetailMat, new THREE.Vector3(1, 0.65, 0.9), upperArm);
-
-      const elbow = new THREE.Group();
-      elbow.position.y = -0.42;
-      upperArm.add(elbow);
-      addArmorPiece(new THREE.SphereGeometry(0.09, 16, 12), new THREE.Vector3(0, 0, 0), armorDetailMat, null, elbow);
-
-      const forearm = new THREE.Group();
-      forearm.position.y = -0.05;
-      elbow.add(forearm);
-      addArmorPiece(new THREE.CapsuleGeometry(0.12, 0.27, 8, 14), new THREE.Vector3(0, -0.19, 0), armorDetailMat, new THREE.Vector3(1, 1, 0.88), forearm);
-      addArmorPiece(new THREE.BoxGeometry(0.16, 0.12, 0.18), new THREE.Vector3(0, -0.37, 0.01), armorSurfaceMat, null, forearm);
-      const palm = new THREE.Group();
-      palm.position.y = -0.41;
-      forearm.add(palm);
-      addArmorPiece(new THREE.SphereGeometry(0.085, 16, 12), new THREE.Vector3(0, -0.06, 0), armorSurfaceMat, new THREE.Vector3(1, 1.2, 0.75), palm);
-      const repulsor = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 10), suitCoreMat);
-      repulsor.position.set(0, -0.07, 0.07);
-      palm.add(repulsor);
-      articulatedArms.push({ side, shoulder, elbow, palm });
-
-      const hip = new THREE.Group();
-      hip.position.set(side * 0.17, -0.4, 0);
-      pelvisGroup.add(hip);
-      addArmorPiece(new THREE.SphereGeometry(0.14, 16, 12), new THREE.Vector3(0, -0.1, 0), armorDetailMat, new THREE.Vector3(1, 1.2, 0.9), hip);
-      addArmorPiece(new THREE.CapsuleGeometry(0.14, 0.32, 8, 14), new THREE.Vector3(0, -0.31, 0), armorSurfaceMat, new THREE.Vector3(1, 1, 0.88), hip);
-
-      const knee = new THREE.Group();
-      knee.position.y = -0.52;
-      hip.add(knee);
-      addArmorPiece(new THREE.SphereGeometry(0.13, 16, 12), new THREE.Vector3(0, 0, 0.025), armorDetailMat, new THREE.Vector3(1, 0.85, 0.7), knee);
-      const shin = new THREE.Group();
-      shin.position.y = -0.06;
-      knee.add(shin);
-      addArmorPiece(new THREE.CapsuleGeometry(0.115, 0.34, 8, 14), new THREE.Vector3(0, -0.22, 0), armorDetailMat, new THREE.Vector3(1, 1, 0.84), shin);
-      const boot = new THREE.Group();
-      boot.position.set(0, -0.43, 0.07);
-      shin.add(boot);
-      addArmorPiece(new THREE.SphereGeometry(0.16, 18, 12), new THREE.Vector3(0, -0.06, 0.04), armorSurfaceMat, new THREE.Vector3(0.88, 0.55, 1.3), boot);
-      articulatedLegs.push({ side, hip, knee, ankle: boot });
-    }
-
-    holoAssembly.add(armorFigure, arcCore, ring1, ring2);
-    scene.add(holoAssembly);
-
-    let imageHolo = null;
-    let activeHologram = holoAssembly;
-    let armorMotion = 'idle';
-
-    // -------------------------------------------------------------
-    // 9. STARKPAD TABLET + 3D POSITIONAL CHIME AUDIO
-    // -------------------------------------------------------------
-    const grabbables = [];
-    const holoStatus = document.getElementById('holo-status');
-    const holoImageInput = document.getElementById('holo-image-input');
-
-    function disposeImageHolo() {
-      activeHoloGrips.clear();
-      holoGesture = null;
-      if (!imageHolo) return;
-      scene.remove(imageHolo);
-      imageHolo.traverse((object) => {
-        if (!object.isMesh && !object.isLineSegments) return;
-        object.geometry.dispose();
-        const materialsToDispose = Array.isArray(object.material) ? object.material : [object.material];
-        materialsToDispose.forEach((material) => {
-          if (material.map) material.map.dispose();
-          material.dispose();
-        });
-      });
-      imageHolo = null;
-    }
-
-    holoImageInput.addEventListener('change', () => {
-      const file = holoImageInput.files?.[0];
-      if (!file) return;
-
-      const objectUrl = URL.createObjectURL(file);
-      const image = new Image();
-      image.onload = () => {
-        URL.revokeObjectURL(objectUrl);
-        disposeImageHolo();
-
-        const texture = new THREE.Texture(image);
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.needsUpdate = true;
-        const fitScale = Math.min(1.25 / image.width, 1.3 / image.height);
-        const width = image.width * fitScale;
-        const height = image.height * fitScale;
-        const imageGroup = new THREE.Group();
-        imageGroup.position.set(0, 1.85, 0);
-
-        const frame = new THREE.LineSegments(
-          new THREE.EdgesGeometry(new THREE.BoxGeometry(width + 0.08, height + 0.08, 0.015)),
-          new THREE.LineBasicMaterial({ color: 0x00eaff })
-        );
-        frame.position.z = -0.012;
-        imageGroup.add(frame);
-
-        const plane = new THREE.Mesh(
-          new THREE.PlaneGeometry(width, height),
-          new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide })
-        );
-        imageGroup.add(plane);
-        imageHolo = imageGroup;
-        scene.add(imageHolo);
-        holoAssembly.visible = false;
-        activeHologram = imageHolo;
-        holoStatus.textContent = `Loaded ${file.name}. Squeeze near the hologram to move it; use both hands to resize and rotate.`;
-      };
-      image.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
-        holoStatus.textContent = `Could not load ${file.name}. Choose a supported image file and try again.`;
-      };
-      image.src = objectUrl;
-    });
-
-    document.getElementById('restore-armor').addEventListener('click', () => {
-      disposeImageHolo();
-      holoAssembly.visible = true;
-      activeHologram = holoAssembly;
-      armorMotion = 'idle';
-      holoStatus.textContent = 'Powered armor restored. Say “wave”, “pose”, “walk”, or “neutral” to articulate it.';
-    });
-
-    const padGroup = new THREE.Group();
-    padGroup.position.set(-0.65, 1.03, 0.2);
-    padGroup.rotation.x = -Math.PI / 2;
-
-    const padBody = new THREE.Mesh(
-      new THREE.BoxGeometry(0.32, 0.22, 0.012),
-      new THREE.MeshStandardMaterial({ color: 0x1a2433, metalness: 0.9, roughness: 0.2 })
-    );
-    padGroup.add(padBody);
-
-    const padEdge = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(0.322, 0.222, 0.013)),
-      new THREE.LineBasicMaterial({ color: 0x00f0ff })
-    );
-    padGroup.add(padEdge);
-
-    const padCanvas = document.createElement('canvas');
-    padCanvas.width = 512;
-    padCanvas.height = 340;
-    const padCtx = padCanvas.getContext('2d');
-    const padTexture = new THREE.CanvasTexture(padCanvas);
-
-    const padScreen = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.30, 0.20),
-      new THREE.MeshBasicMaterial({ map: padTexture, transparent: true })
-    );
-    padScreen.position.z = 0.007;
-    padGroup.add(padScreen);
-
-    // StarkPad 3D Audio Emitter
-    const padAudio = new THREE.PositionalAudio(audioListener);
-    padAudio.setRefDistance(0.8);
-    padAudio.setMaxDistance(10);
-    padAudio.setRolloffFactor(1.8);
-    padGroup.add(padAudio);
-
-    let tabletScreenMode = 0;
-    const tabletModes = ["DIAGNOSTICS", "POWER GRID", "REPULSOR CALIBRATION"];
-
-    function updateTabletScreen() {
-      padCtx.fillStyle = '#06101c';
-      padCtx.fillRect(0, 0, 512, 340);
-
-      padCtx.fillStyle = '#00f0ff';
-      padCtx.font = 'bold 22px monospace';
-      padCtx.fillText("STARKPAD // OS 14.2", 20, 36);
-
-      padCtx.fillStyle = '#ff7700';
-      padCtx.font = 'bold 18px sans-serif';
-      padCtx.fillText(`[${tabletModes[tabletScreenMode]}]`, 310, 36);
-
-      padCtx.strokeStyle = '#00f0ff55';
-      padCtx.lineWidth = 2;
-      padCtx.beginPath();
-      padCtx.moveTo(20, 48);
-      padCtx.lineTo(492, 48);
-      padCtx.stroke();
-
-      if (tabletScreenMode === 0) {
-        padCtx.fillStyle = '#ffffff';
-        padCtx.font = '20px monospace';
-        padCtx.fillText("ARC CORE OUTPUT: 3.2 GJ/s", 25, 90);
-        padCtx.fillText("ARMOR PLATING: TITANIUM-GOLD", 25, 125);
-        padCtx.fillText("THRUST VECTOR: NOMINAL", 25, 160);
-        padCtx.fillText("DEFENSE PROTOCOL: LEVEL 5", 25, 195);
-      } else if (tabletScreenMode === 1) {
-        padCtx.fillStyle = '#38ef7d';
-        padCtx.font = '20px monospace';
-        padCtx.fillText("GRID STATUS: 99.4% STABLE", 25, 90);
-        padCtx.fillText("AUX GENERATOR: ACTIVE", 25, 125);
-        padCtx.fillText("COOLING SYSTEM: CRYOGENIC", 25, 160);
-        padCtx.fillText("DUM-E INTEGRITY: QUESTIONABLE", 25, 195);
-      } else {
-        padCtx.fillStyle = '#ff3366';
-        padCtx.font = '20px monospace';
-        padCtx.fillText("LEFT REPULSOR: 100% READY", 25, 90);
-        padCtx.fillText("RIGHT REPULSOR: 100% READY", 25, 125);
-        padCtx.fillText("UNIBEAM VOLTAGE: CHARGED", 25, 160);
-        padCtx.fillText("TARGET LOCK: STANDBY", 25, 195);
-      }
-
-      padCtx.fillStyle = '#00d2ff';
-      for (let i = 0; i < 28; i++) {
-        const barH = Math.random() * 45 + 5;
-        padCtx.fillRect(25 + i * 16, 300 - barH, 10, barH);
-      }
-      padTexture.needsUpdate = true;
-    }
-    updateTabletScreen();
-
-    padGroup.userData = {
-      isGrabbable: true,
-      heldBy: null,
-      onTrigger: () => {
-        tabletScreenMode = (tabletScreenMode + 1) % tabletModes.length;
-        updateTabletScreen();
-
-        // Play 3D chime right at the tablet's position
-        if (padAudio.isPlaying) padAudio.stop();
-        padAudio.setBuffer(bufChime);
-        padAudio.play();
-
-        jarvisSpeak(`Switching StarkPad to ${tabletModes[tabletScreenMode]} mode.`);
-      }
-    };
-    grabbables.push(padGroup);
-    scene.add(padGroup);
-
-    // -------------------------------------------------------------
-    // 10. ARC PLASMA TORCH + 3D POSITIONAL BUZZ & IGNITE
-    // -------------------------------------------------------------
-    const toolGroup = new THREE.Group();
-    toolGroup.position.set(0.65, 1.04, 0.2);
-
-    const toolHandle = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.02, 0.025, 0.18, 16),
-      new THREE.MeshStandardMaterial({ color: 0x222a36, roughness: 0.3, metalness: 0.9 })
-    );
-    toolHandle.rotation.x = Math.PI / 2;
-    toolGroup.add(toolHandle);
-
-    const toolGuard = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.02, 16), materials.cautionStripe);
-    toolGuard.position.z = -0.06;
-    toolGuard.rotation.x = Math.PI / 2;
-    toolGroup.add(toolGuard);
-
-    const nozzle = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.015, 0.02, 0.07, 16),
-      new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.2 })
-    );
-    nozzle.position.z = -0.12;
-    nozzle.rotation.x = Math.PI / 2;
-    toolGroup.add(nozzle);
-
-    const beamGeo = new THREE.CylinderGeometry(0.005, 0.012, 0.65, 8);
-    const beamMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.9 });
-    const beam = new THREE.Mesh(beamGeo, beamMat);
-    beam.position.z = -0.45;
-    beam.rotation.x = Math.PI / 2;
-    beam.visible = false;
-    toolGroup.add(beam);
-
-    const beamLight = new THREE.PointLight(0x00f0ff, 0, 2.5);
-    beamLight.position.z = -0.45;
-    toolGroup.add(beamLight);
-
-    // 3D Spatial Audio Emitters on the Plasma Nozzle
-    const torchIgniteAudio = new THREE.PositionalAudio(audioListener);
-    torchIgniteAudio.setRefDistance(0.8);
-    torchIgniteAudio.setMaxDistance(12);
-    toolGroup.add(torchIgniteAudio);
-
-    const torchBuzzAudio = new THREE.PositionalAudio(audioListener);
-    torchBuzzAudio.setRefDistance(1.0);
-    torchBuzzAudio.setMaxDistance(12);
-    torchBuzzAudio.setRolloffFactor(1.5);
-    torchBuzzAudio.setLoop(true);
-    toolGroup.add(torchBuzzAudio);
-
-    toolGroup.userData = {
-      isGrabbable: true,
-      heldBy: null,
-      isFiring: false,
-      onTriggerStart: () => {
-        toolGroup.userData.isFiring = true;
-        beam.visible = true;
-        beamLight.intensity = 3.5;
-
-        // Play 3D ignition pop
-        if (torchIgniteAudio.isPlaying) torchIgniteAudio.stop();
-        torchIgniteAudio.setBuffer(bufIgnite);
-        torchIgniteAudio.play();
-
-        // Start looping plasma hum
-        if (!torchBuzzAudio.isPlaying) {
-          torchBuzzAudio.setBuffer(bufPlasma);
-          torchBuzzAudio.play();
-        }
-      },
-      onTriggerEnd: () => {
-        toolGroup.userData.isFiring = false;
-        beam.visible = false;
-        beamLight.intensity = 0;
-
-        // Stop continuous plasma buzz
-        if (torchBuzzAudio.isPlaying) {
-          torchBuzzAudio.stop();
-        }
-      }
-    };
-    grabbables.push(toolGroup);
-    scene.add(toolGroup);
-
-    // -------------------------------------------------------------
-    // 11. CONTROLLER 3D GRAB SOUNDS
-    // -------------------------------------------------------------
-    const grabAudio0 = new THREE.PositionalAudio(audioListener);
-    const grabAudio1 = new THREE.PositionalAudio(audioListener);
-    grabAudio0.setRefDistance(0.5);
-    grabAudio1.setRefDistance(0.5);
-
-    // -------------------------------------------------------------
-    // 12. J.A.R.V.I.S. HUD BILLBOARD & SPEECH ENGINE
-    // -------------------------------------------------------------
-    const hudCanvas = document.createElement('canvas');
-    hudCanvas.width = 512;
-    hudCanvas.height = 256;
-    const hudCtx = hudCanvas.getContext('2d');
-    const hudTexture = new THREE.CanvasTexture(hudCanvas);
-
-    const hudPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.7, 0.35),
-      new THREE.MeshBasicMaterial({ map: hudTexture, transparent: true, side: THREE.DoubleSide })
-    );
-    hudPlane.position.set(0, 1.95, -0.2);
-    scene.add(hudPlane);
-
-    function updateJarvisHUD(mainText, subText = "J.A.R.V.I.S. // ONLINE") {
-      hudCtx.clearRect(0, 0, 512, 256);
-      hudCtx.strokeStyle = 'rgba(0, 240, 255, 0.6)';
-      hudCtx.lineWidth = 4;
-      hudCtx.strokeRect(10, 10, 492, 236);
-
-      hudCtx.fillStyle = '#00f0ff';
-      hudCtx.font = 'bold 24px monospace';
-      hudCtx.fillText(subText, 25, 48);
-
-      hudCtx.fillStyle = '#ffffff';
-      hudCtx.font = 'bold 26px sans-serif';
-      hudCtx.fillText(mainText, 25, 120);
-
-      hudCtx.fillStyle = 'rgba(0, 240, 255, 0.7)';
-      for (let i = 0; i < 20; i++) {
-        const h = Math.random() * 30 + 5;
-        hudCtx.fillRect(25 + i * 23, 180 - h / 2, 14, h);
-      }
-      hudTexture.needsUpdate = true;
-    }
-    updateJarvisHUD("Awaiting voice command, sir.");
-
+    let isMaskOpen = false;
     let isExploded = false;
+    let maskProgress = 0;
+    let explodeProgress = 0;
+
+    // Placed to the left of the hologram, angled toward seated player
+    const terminalGroup = new THREE.Group();
+    terminalGroup.position.set(-0.75, 1.25, 0.2);
+    terminalGroup.rotation.y = Math.PI / 5;
+
+    const termCanvas = document.createElement('canvas');
+    termCanvas.width = 1024;
+    termCanvas.height = 768;
+    const termCtx = termCanvas.getContext('2d');
+    const termTexture = new THREE.CanvasTexture(termCanvas);
+
+    const termScreen = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.75, 0.56),
+      new THREE.MeshBasicMaterial({ map: termTexture, transparent: true, side: THREE.DoubleSide })
+    );
+    terminalGroup.add(termScreen);
+
+    // Positional chime for terminal interactions
+    const termAudio = new THREE.PositionalAudio(audioListener);
+    termAudio.setRefDistance(0.9);
+    termAudio.setMaxDistance(10);
+    terminalGroup.add(termAudio);
+
+    scene.add(terminalGroup);
+
+    function drawTerminalUI() {
+      termCtx.fillStyle = 'rgba(5, 12, 22, 0.95)';
+      termCtx.fillRect(0, 0, 1024, 768);
+
+      termCtx.strokeStyle = '#00f0ff';
+      termCtx.lineWidth = 4;
+      termCtx.strokeRect(10, 10, 1004, 748);
+
+      termCtx.fillStyle = '#00f0ff';
+      termCtx.font = 'bold 36px monospace';
+      termCtx.fillText("STARK OS // WORKSHOP COMMAND", 40, 60);
+
+      termCtx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
+      termCtx.lineWidth = 2;
+      termCtx.beginPath();
+      termCtx.moveTo(40, 80);
+      termCtx.lineTo(984, 80);
+      termCtx.stroke();
+
+      termCtx.fillStyle = '#ffcc00';
+      termCtx.font = 'bold 28px sans-serif';
+      termCtx.fillText("HAND GESTURES GUIDE", 40, 130);
+
+      termCtx.fillStyle = '#ffffff';
+      termCtx.font = '24px monospace';
+      termCtx.fillText("• PINCH (Index+Thumb): Grab & rotate suit / Click buttons", 50, 175);
+      termCtx.fillText("• TWO-HAND PINCH & PULL: Expand / Scale suit size", 50, 215);
+      termCtx.fillText("• QUICK TAP (Trigger): Toggle mask open/closed", 50, 255);
+
+      termCtx.fillStyle = '#ffcc00';
+      termCtx.font = 'bold 28px sans-serif';
+      termCtx.fillText("CONTROLLER GUIDE", 40, 315);
+
+      termCtx.fillStyle = '#ffffff';
+      termCtx.font = '24px monospace';
+      termCtx.fillText("• RIGHT STICK (Left/Right): Spin suit 360°", 50, 360);
+      termCtx.fillText("• RIGHT STICK (Up/Down): Scale size larger/smaller", 50, 400);
+      termCtx.fillText("• INDEX TRIGGER (tap): Toggle faceplate mask", 50, 440);
+      termCtx.fillText("• GRIP SQUEEZE: Explode / Assemble schematics", 50, 480);
+      termCtx.fillText("• LEFT STICK: Smooth seated gliding", 50, 520);
+
+      termCtx.fillStyle = '#38ef7d';
+      termCtx.font = 'bold 28px sans-serif';
+      termCtx.fillText("J.A.R.V.I.S. VOICE COMMANDS", 40, 580);
+
+      termCtx.fillStyle = '#8be4fc';
+      termCtx.font = '22px monospace';
+      termCtx.fillText('"Open mask" | "Close mask" | "Explode" | "Assemble" | "Exit simulation"', 50, 625);
+
+      termCtx.fillStyle = 'rgba(0, 240, 255, 0.2)';
+      termCtx.fillRect(40, 660, 944, 60);
+      termCtx.fillStyle = '#00f0ff';
+      termCtx.font = 'bold 24px monospace';
+      termCtx.fillText(`MASK: ${isMaskOpen ? 'DISENGAGED' : 'SEALED'}  |  VIEW: ${isExploded ? 'EXPLODED' : 'SOLID'}`, 60, 700);
+
+      termTexture.needsUpdate = true;
+    }
+
+    // -------------------------------------------------------------
+    // 11. 3D HOLOGRAPHIC INTERACTIVE BUTTONS (Including EXIT)
+    // -------------------------------------------------------------
+    const clickableButtons = [];
+
+    function createHoloButton(label, yOffset, colorHex, action) {
+      const btnGroup = new THREE.Group();
+      btnGroup.position.set(0, yOffset, 0.02);
+
+      const plate = new THREE.Mesh(
+        new THREE.BoxGeometry(0.24, 0.065, 0.015),
+        new THREE.MeshBasicMaterial({ color: 0x061424, transparent: true, opacity: 0.85 })
+      );
+
+      const frame = new THREE.LineSegments(
+        new THREE.EdgesGeometry(plate.geometry),
+        new THREE.LineBasicMaterial({ color: colorHex })
+      );
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 70;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 24px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, 128, 35);
+
+      const textPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.23, 0.06),
+        new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true })
+      );
+      textPlane.position.z = 0.01;
+
+      btnGroup.add(plate, frame, textPlane);
+      plate.userData = { action, defaultColor: colorHex };
+      clickableButtons.push(plate);
+      return btnGroup;
+    }
+
+    const btnMask = createHoloButton("TOGGLE MASK", -0.19, 0x00f0ff, () => toggleMask());
+    terminalGroup.add(btnMask);
+
+    const btnExplode = createHoloButton("EXPLODE VIEW", -0.26, 0xffd700, () => toggleExplode());
+    terminalGroup.add(btnExplode);
+
+    const btnExit = createHoloButton("EXIT LAB [X]", -0.33, 0xff3b30, () => exitSimulation());
+    terminalGroup.add(btnExit);
+
+    // -------------------------------------------------------------
+    // 12. SYSTEM CONTROLS (ACTUATION & EXIT)
+    // -------------------------------------------------------------
+    function toggleMask(state = !isMaskOpen) {
+      isMaskOpen = state;
+      drawTerminalUI();
+      playPositional(servoAudio, bufServo);
+      jarvisSpeak(isMaskOpen ? "Faceplate disengaged, sir." : "Faceplate sealed.");
+    }
+
+    function toggleExplode(state = !isExploded) {
+      isExploded = state;
+      drawTerminalUI();
+      playPositional(servoAudio, bufSurge);
+      jarvisSpeak(isExploded ? "Expanding armor schematics." : "Reassembling components.");
+    }
+
+    function exitSimulation() {
+      jarvisSpeak("Powering down workshop. Goodbye, sir.");
+      const session = renderer.xr.getSession();
+      if (session) {
+        session.end();
+      }
+    }
+
+    // -------------------------------------------------------------
+    // 13. J.A.R.V.I.S. SPEECH ENGINE
+    // -------------------------------------------------------------
     function jarvisSpeak(phrase) {
       if (!('speechSynthesis' in window)) return;
       window.speechSynthesis.cancel();
@@ -1229,56 +745,31 @@
       utterance.pitch = 0.95;
       utterance.rate = 1.0;
       window.speechSynthesis.speak(utterance);
-      updateJarvisHUD(phrase, "J.A.R.V.I.S. // RESPONDING");
     }
 
     function handleJarvisCommand(rawTranscript) {
       const text = rawTranscript.toLowerCase().trim();
-      updateJarvisHUD(`"${text}"`, "TRANSCRIPT RECEIVED");
 
-      if (text.includes("explode") || text.includes("disassemble")) {
-        isExploded = true;
-        jarvisSpeak("Expanding armor telemetry, sir.");
-      } else if (text.includes("assemble") || text.includes("put back")) {
-        isExploded = false;
-        jarvisSpeak("Reassembling components.");
-      } else if (text.includes("red") || text.includes("gold")) {
-        applyHoloColor(0xff3b30);
-        jarvisSpeak("Applying hot-rod crimson palette.");
-      } else if (text.includes("blue") || text.includes("cyan")) {
-        applyHoloColor(0x00f0ff);
-        jarvisSpeak("Restoring Stark cyan.");
-      } else if (text.includes("green")) {
-        applyHoloColor(0x30d158);
-        jarvisSpeak("Switching to diagnostic green.");
-      } else if (text.includes("wave")) {
-        armorMotion = "wave";
-        jarvisSpeak("Arm articulation online. Waving hello.");
-      } else if (text.includes("walk")) {
-        armorMotion = "walk";
-        jarvisSpeak("Walking motion engaged.");
-      } else if (text.includes("pose")) {
-        armorMotion = "pose";
-        jarvisSpeak("Setting the armor display pose.");
-      } else if (text.includes("stand") || text.includes("neutral") || text.includes("stop")) {
-        armorMotion = "idle";
-        jarvisSpeak("Returning to neutral stance.");
+      if (text.includes("exit") || text.includes("quit") || text.includes("power down") || text.includes("close simulation")) {
+        exitSimulation();
+      } else if (text.includes("mask") || text.includes("faceplate")) {
+        if (text.includes("close") || text.includes("shut")) toggleMask(false);
+        else toggleMask(true);
+      } else if (text.includes("explode") || text.includes("disassemble") || text.includes("expand")) {
+        toggleExplode(true);
+      } else if (text.includes("assemble") || text.includes("collapse") || text.includes("put back")) {
+        toggleExplode(false);
+      } else if (text.includes("rotate left")) {
+        holoRig.rotation.y -= 0.6;
+      } else if (text.includes("rotate right")) {
+        holoRig.rotation.y += 0.6;
+      } else if (text.includes("scale up") || text.includes("bigger")) {
+        holoRig.scale.multiplyScalar(1.25).clampScalar(0.25, 1.8);
+      } else if (text.includes("scale down") || text.includes("smaller")) {
+        holoRig.scale.multiplyScalar(0.8).clampScalar(0.25, 1.8);
       } else if (text.includes("status") || text.includes("hello")) {
-        jarvisSpeak("Workshop systems online. Say wave, pose, walk, or neutral to articulate the armor.");
+        jarvisSpeak("All workshop telemetry and gestural sensors are nominal, sir.");
       }
-    }
-
-    function applyHoloColor(hex) {
-      holoLight.color.setHex(hex);
-      emitterRing.material.color.setHex(hex);
-      [arcCoreMat, armorSurfaceMat, armorDetailMat].forEach(m => {
-        m.color.setHex(hex);
-        m.emissive.setHex(hex);
-      });
-      armorLineMat.color.setHex(hex);
-      suitCoreMat.color.setHex(hex);
-      ring1.material.color.setHex(hex);
-      ring2.material.color.setHex(hex);
     }
 
     function initSpeechEngine() {
@@ -1289,225 +780,189 @@
       recognition.interimResults = false;
       recognition.lang = 'en-US';
       recognition.onresult = (event) => {
-        const lastResult = event.results[event.results.length - 1];
-        if (lastResult.isFinal) handleJarvisCommand(lastResult[0].transcript);
+        const last = event.results[event.results.length - 1];
+        if (last.isFinal) handleJarvisCommand(last[0].transcript);
       };
       recognition.onend = () => { try { recognition.start(); } catch (_) {} };
       try { recognition.start(); } catch (_) {}
     }
 
     // -------------------------------------------------------------
-    // 13. WEBXR CONTROLLERS, 3D GRAB & TRIGGER INTERACTIONS
+    // 14. INPUT PIPELINE: HANDS, CONTROLLERS & RAYCASTING
     // -------------------------------------------------------------
     const controllerFactory = new XRControllerModelFactory();
+    const handFactory = new XRHandModelFactory();
+
+    // Hand rigs — parented to cameraRig so they follow locomotion
+    const hand0 = renderer.xr.getHand(0);
+    hand0.add(handFactory.createHandModel(hand0, 'mesh'));
+    cameraRig.add(hand0);
+
+    const hand1 = renderer.xr.getHand(1);
+    hand1.add(handFactory.createHandModel(hand1, 'mesh'));
+    cameraRig.add(hand1);
+
+    // Controllers
     const c0 = renderer.xr.getController(0);
     const c1 = renderer.xr.getController(1);
     const cGrip0 = renderer.xr.getControllerGrip(0);
     const cGrip1 = renderer.xr.getControllerGrip(1);
-
     cGrip0.add(controllerFactory.createControllerModel(cGrip0));
     cGrip1.add(controllerFactory.createControllerModel(cGrip1));
-    cGrip0.add(grabAudio0);
-    cGrip1.add(grabAudio1);
     cameraRig.add(c0, c1, cGrip0, cGrip1);
 
+    // Grab-snap audio emitters on the grips
+    const grabAudio0 = new THREE.PositionalAudio(audioListener);
+    const grabAudio1 = new THREE.PositionalAudio(audioListener);
+    grabAudio0.setRefDistance(0.5);
+    grabAudio1.setRefDistance(0.5);
+    cGrip0.add(grabAudio0);
+    cGrip1.add(grabAudio1);
+
     const laserGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -2)]);
-    const laserMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.4 });
+    const laserMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.5 });
     c0.add(new THREE.Line(laserGeo, laserMat));
     c1.add(new THREE.Line(laserGeo, laserMat));
 
-    const activeHoloGrips = new Map();
-    let holoGesture = null;
+    // Raycaster for clicking terminal buttons
+    const raycaster = new THREE.Raycaster();
+    const tempMatrix = new THREE.Matrix4();
 
-    function resetHoloGesture() {
-      const grips = [...activeHoloGrips.keys()];
-      if (grips.length === 0) {
-        holoGesture = null;
-        return;
-      }
+    // Two-Hand Pinch & Pull tracker
+    const grabState = {
+      h0Pinching: false,
+      h1Pinching: false,
+      initialDistance: 0,
+      initialScale: 0.65
+    };
 
-      const first = new THREE.Vector3();
-      grips[0].getWorldPosition(first);
-      const target = activeHoloGrips.get(grips[0]);
-      if (grips.length === 1) {
-        holoGesture = { target, previousCenter: first };
-        return;
-      }
+    // One-Hand Grab & Rotate tracker (with tap-vs-drag detection for mask toggle)
+    const dragState = {
+      active: false,
+      controller: null,
+      lastPos: new THREE.Vector3(),
+      moved: 0,
+      startTime: 0,
+      startedOnButton: false
+    };
 
-      const second = new THREE.Vector3();
-      grips[1].getWorldPosition(second);
-      const span = second.clone().sub(first);
-      holoGesture = {
-        target,
-        previousCenter: first.clone().add(second).multiplyScalar(0.5),
-        previousDistance: Math.max(span.length(), 0.01),
-        previousAngle: Math.atan2(span.x, span.z)
-      };
-    }
-
-    function startHoloManipulation(controller, grip, grabAudio, gripPos) {
-      const target = activeHoloGrips.size > 0
-        ? activeHoloGrips.values().next().value
-        : activeHologram;
-      if (!target?.visible) return false;
-
-      const targetPos = new THREE.Vector3();
-      target.getWorldPosition(targetPos);
-      const reach = activeHoloGrips.size > 0 ? 1.1 : 0.75;
-      if (gripPos.distanceTo(targetPos) > reach) return false;
-
-      activeHoloGrips.set(grip, target);
-      controller.userData.holoGrip = grip;
-      resetHoloGesture();
-      if (grabAudio.isPlaying) grabAudio.stop();
-      grabAudio.setBuffer(bufGrab);
-      grabAudio.play();
-      holoStatus.textContent = activeHoloGrips.size === 1
-        ? 'Hologram selected. Move one hand to reposition; squeeze with the other hand to resize and rotate.'
-        : 'Two hands locked. Move them apart or together to resize; twist them to rotate.';
-      return true;
-    }
-
-    function updateHoloManipulation() {
-      if (!holoGesture) return;
-      const grips = [...activeHoloGrips.keys()];
-      const target = holoGesture.target;
-
-      if (grips.length === 1) {
-        const position = new THREE.Vector3();
-        grips[0].getWorldPosition(position);
-        target.position.add(position.clone().sub(holoGesture.previousCenter));
-        holoGesture.previousCenter.copy(position);
-        return;
-      }
-
-      const first = new THREE.Vector3();
-      const second = new THREE.Vector3();
-      grips[0].getWorldPosition(first);
-      grips[1].getWorldPosition(second);
-      const span = second.clone().sub(first);
-      const distance = Math.max(span.length(), 0.01);
-      const center = first.clone().add(second).multiplyScalar(0.5);
-      target.position.add(center.clone().sub(holoGesture.previousCenter));
-
-      const scale = THREE.MathUtils.clamp(
-        target.scale.x * distance / holoGesture.previousDistance,
-        0.2,
-        1.8
-      );
-      target.scale.setScalar(scale);
-      const angle = Math.atan2(span.x, span.z);
-      target.rotation.y += THREE.MathUtils.euclideanModulo(
-        angle - holoGesture.previousAngle + Math.PI,
-        Math.PI * 2
-      ) - Math.PI;
-
-      holoGesture.previousCenter.copy(center);
-      holoGesture.previousDistance = distance;
-      holoGesture.previousAngle = angle;
-    }
-
-    function onGrabStart(event) {
+    function onSelectStart(event) {
       const controller = event.target;
-      const grip = (controller === c0) ? cGrip0 : cGrip1;
-      const grabAudio = (controller === c0) ? grabAudio0 : grabAudio1;
-      const gripPos = new THREE.Vector3();
-      grip.getWorldPosition(gripPos);
+      tempMatrix.identity().extractRotation(controller.matrixWorld);
+      raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+      raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
 
-      if (startHoloManipulation(controller, grip, grabAudio, gripPos)) return;
-
-      let closest = null;
-      let minDist = 0.28;
-
-      for (const obj of grabbables) {
-        if (obj.userData.heldBy) continue;
-        const objPos = new THREE.Vector3();
-        obj.getWorldPosition(objPos);
-        const dist = gripPos.distanceTo(objPos);
-        if (dist < minDist) {
-          minDist = dist;
-          closest = obj;
+      // 1. Interactive terminal buttons take priority
+      const hits = raycaster.intersectObjects(clickableButtons, false);
+      if (hits.length > 0) {
+        const hit = hits[0].object;
+        if (hit.userData.action) {
+          hit.userData.action();
+          playPositional(termAudio, bufChime);
+          dragState.startedOnButton = true;
+          return;
         }
       }
 
-      if (closest) {
-        grip.attach(closest);
-        closest.userData.heldBy = grip;
-        controller.userData.heldObject = closest;
+      // 2. Track pinch state
+      if (controller === c0) grabState.h0Pinching = true;
+      if (controller === c1) grabState.h1Pinching = true;
 
-        // Play 3D magnetic snap sound directly on the controller
-        if (grabAudio.isPlaying) grabAudio.stop();
-        grabAudio.setBuffer(bufGrab);
-        grabAudio.play();
-      }
-    }
-
-    function onGrabEnd(event) {
-      const controller = event.target;
-      if (controller.userData.holoGrip) {
-        activeHoloGrips.delete(controller.userData.holoGrip);
-        delete controller.userData.holoGrip;
-        resetHoloGesture();
-        holoStatus.textContent = 'Hologram released. Squeeze near it again to move, resize, or rotate.';
-        return;
-      }
-
-      const held = controller.userData.heldObject;
-      if (held) {
-        // If holding firing torch, kill audio on drop
-        if (held.userData.onTriggerEnd && held.userData.isFiring) {
-          held.userData.onTriggerEnd();
-        }
-        scene.attach(held);
-        held.userData.heldBy = null;
-        controller.userData.heldObject = null;
-      }
-    }
-
-    function onTriggerStart(event) {
-      const controller = event.target;
-      const held = controller.userData.heldObject;
-
-      if (held) {
-        if (held.userData.onTrigger) held.userData.onTrigger();
-        if (held.userData.onTriggerStart) held.userData.onTriggerStart();
+      if (grabState.h0Pinching && grabState.h1Pinching) {
+        // Two-handed scale: capture baseline
+        const p0 = new THREE.Vector3();
+        const p1 = new THREE.Vector3();
+        c0.getWorldPosition(p0);
+        c1.getWorldPosition(p1);
+        grabState.initialDistance = p0.distanceTo(p1);
+        grabState.initialScale = holoRig.scale.x;
+        dragState.active = false;
+        dragState.controller = null;
       } else {
-        isExploded = !isExploded;
-        jarvisSpeak(isExploded ? "Exploding schematics." : "Reassembling components.");
+        // One-handed grab: begin rotate/drag tracking
+        dragState.active = true;
+        dragState.controller = controller;
+        controller.getWorldPosition(dragState.lastPos);
+        dragState.moved = 0;
+        dragState.startTime = performance.now();
+        dragState.startedOnButton = false;
+        playPositional(controller === c0 ? grabAudio0 : grabAudio1, bufGrab);
       }
     }
 
-    function onTriggerEnd(event) {
+    function onSelectEnd(event) {
       const controller = event.target;
-      const held = controller.userData.heldObject;
-      if (held && held.userData.onTriggerEnd) {
-        held.userData.onTriggerEnd();
+      if (controller === c0) grabState.h0Pinching = false;
+      if (controller === c1) grabState.h1Pinching = false;
+
+      if (dragState.startedOnButton) {
+        dragState.startedOnButton = false;
+        return;
       }
+
+      if (dragState.active && dragState.controller === controller) {
+        // Quick tap (no drag) toggles the faceplate; a hold + drag rotates
+        const quickTap = (performance.now() - dragState.startTime) < 300 && dragState.moved < 0.02;
+        dragState.active = false;
+        dragState.controller = null;
+        if (quickTap) toggleMask();
+      }
+    }
+
+    // Grip Squeeze toggles Explode view
+    function onSqueezeStart(event) {
+      playPositional(event.target === c0 ? grabAudio0 : grabAudio1, bufGrab);
+      toggleExplode();
     }
 
     [c0, c1].forEach(c => {
-      c.addEventListener('squeezestart', onGrabStart);
-      c.addEventListener('squeezeend', onGrabEnd);
-      c.addEventListener('selectstart', onTriggerStart);
-      c.addEventListener('selectend', onTriggerEnd);
+      c.addEventListener('selectstart', onSelectStart);
+      c.addEventListener('selectend', onSelectEnd);
+      c.addEventListener('squeezestart', onSqueezeStart);
     });
 
     // -------------------------------------------------------------
-    // 14. LOCOMOTION ENGINE (Thumbsticks)
+    // 15. LOCOMOTION, DRAG-ROTATE & TWO-HAND EXPAND GESTURE
     // -------------------------------------------------------------
     const clock = new THREE.Clock();
-    let snapCooldown = 0;
 
-    function handleLocomotion(delta) {
+    function handleInput(delta) {
       const session = renderer.xr.getSession();
+
+      // One-hand grab & rotate / raise the hologram
+      if (dragState.active && dragState.controller && !(grabState.h0Pinching && grabState.h1Pinching)) {
+        const pos = new THREE.Vector3();
+        dragState.controller.getWorldPosition(pos);
+        const dx = pos.x - dragState.lastPos.x;
+        const dy = pos.y - dragState.lastPos.y;
+        holoRig.rotation.y += dx * 4.0;
+        holoBaseY = THREE.MathUtils.clamp(holoBaseY + dy * 0.5, 0.7, 1.6);
+        dragState.moved += Math.abs(dx) + Math.abs(dy);
+        dragState.lastPos.copy(pos);
+      }
+
       if (!session) return;
 
+      // Two-Handed Pinch & Pull (Expands or contracts hologram scale)
+      if (grabState.h0Pinching && grabState.h1Pinching && grabState.initialDistance > 0.05) {
+        const p0 = new THREE.Vector3();
+        const p1 = new THREE.Vector3();
+        c0.getWorldPosition(p0);
+        c1.getWorldPosition(p1);
+        const currentDist = p0.distanceTo(p1);
+        const scaleMultiplier = currentDist / grabState.initialDistance;
+        const targetScale = THREE.MathUtils.clamp(grabState.initialScale * scaleMultiplier, 0.25, 1.8);
+        holoRig.scale.setScalar(targetScale);
+      }
+
+      // Thumbstick Locomotion & Suit Control
       for (const source of session.inputSources) {
         if (!source.gamepad) continue;
         const axes = source.gamepad.axes;
         const x = Math.abs(axes[2]) > 0.05 ? axes[2] : (Math.abs(axes[0]) > 0.05 ? axes[0] : 0);
         const y = Math.abs(axes[3]) > 0.05 ? axes[3] : (Math.abs(axes[1]) > 0.05 ? axes[1] : 0);
 
+        // Left Stick: Seated Gliding
         if (source.handedness === 'left' && (Math.abs(x) > 0.15 || Math.abs(y) > 0.15)) {
           const forward = new THREE.Vector3();
           camera.getWorldDirection(forward);
@@ -1515,116 +970,69 @@
           forward.normalize();
           const right = new THREE.Vector3().crossVectors(camera.up, forward).negate().normalize();
 
-          cameraRig.position.addScaledVector(forward, -y * 3.0 * delta);
-          cameraRig.position.addScaledVector(right, x * 3.0 * delta);
+          cameraRig.position.addScaledVector(forward, -y * 2.2 * delta);
+          cameraRig.position.addScaledVector(right, x * 2.2 * delta);
         }
 
-        if (source.handedness === 'right' && snapCooldown <= 0) {
-          if (x > 0.6) {
-            cameraRig.rotation.y -= Math.PI / 4;
-            snapCooldown = 0.3;
-          } else if (x < -0.6) {
-            cameraRig.rotation.y += Math.PI / 4;
-            snapCooldown = 0.3;
+        // Right Stick: Rotate and Scale suit
+        if (source.handedness === 'right') {
+          if (Math.abs(x) > 0.15) holoRig.rotation.y += x * 2.5 * delta;
+          if (Math.abs(y) > 0.15) {
+            const factor = THREE.MathUtils.clamp(1.0 - y * 1.0 * delta, 0.95, 1.05);
+            holoRig.scale.multiplyScalar(factor).clampScalar(0.25, 1.8);
           }
         }
       }
-      if (snapCooldown > 0) snapCooldown -= delta;
     }
 
     // -------------------------------------------------------------
-    // 15. MAIN RENDER LOOP & AUDIO LISTENER SYNC
+    // 16. MAIN ANIMATION LOOP
     // -------------------------------------------------------------
-    let explodeLerp = 0;
-
     renderer.setAnimationLoop((timestamp) => {
       const delta = clock.getDelta();
       const time = timestamp * 0.001;
 
-      handleLocomotion(delta);
+      handleInput(delta);
 
-      // Holo rotation
-      arcCore.rotation.y = time * 0.9;
-      ring1.rotation.z = time * 0.3;
-      ring2.rotation.z = -time * 0.25;
+      // Faceplate actuation
+      const targetMask = isMaskOpen ? 1.0 : 0.0;
+      maskProgress += (targetMask - maskProgress) * 0.12;
+      holoSuit.faceplate.position.y = 0.01 + maskProgress * 0.07;
+      holoSuit.faceplate.position.z = 0.08 - maskProgress * 0.02;
+      holoSuit.faceplate.rotation.x = -maskProgress * (Math.PI / 4);
 
-      const targetLerp = isExploded ? 1.0 : 0.0;
-      explodeLerp += (targetLerp - explodeLerp) * 0.08;
+      // Explode actuation
+      const targetExplode = isExploded ? 1.0 : 0.0;
+      explodeProgress += (targetExplode - explodeProgress) * 0.08;
+      holoSuit.helmet.position.y = 1.62 + explodeProgress * 0.18;
+      holoSuit.torso.position.z = explodeProgress * 0.08;
+      holoSuit.armL.position.x = -0.25 - explodeProgress * 0.15;
+      holoSuit.armR.position.x = 0.25 + explodeProgress * 0.15;
+      holoSuit.legL.position.y = 0.9 - explodeProgress * 0.14;
+      holoSuit.legR.position.y = 0.9 - explodeProgress * 0.14;
 
-      helmetGroup.position.y = 0.57 + explodeLerp * 0.35;
-      ring1.position.y = 0.12 - explodeLerp * 0.2;
-      ring2.position.y = 0.12 + explodeLerp * 0.45;
-      arcCore.scale.setScalar(1.0 + explodeLerp * 0.4);
+      // Idle life: gimbal spin, gentle hover bob, light flicker
+      gimbalRing1.rotation.z = time * 0.3;
+      holoRig.position.y = holoBaseY + Math.sin(time * 1.2) * 0.025;
+      holoLight.intensity = 2.6 + Math.sin(time * 2.2) * 0.25;
 
-      torsoGroup.rotation.z = armorMotion === "pose" ? 0.08 : Math.sin(time * 1.4) * 0.012;
-      for (const arm of articulatedArms) {
-        const waving = armorMotion === "wave" && arm.side === 1;
-        arm.shoulder.rotation.z = waving
-          ? 1.25 + Math.sin(time * 5) * 0.14
-          : armorMotion === "pose"
-            ? arm.side * 0.52
-            : armorMotion === "walk"
-              ? Math.sin(time * 5) * 0.22
-              : Math.sin(time * 1.2 + arm.side) * 0.025;
-        arm.shoulder.rotation.x = armorMotion === "pose" ? -0.12 : 0;
-        arm.elbow.rotation.z = waving
-          ? -0.85 + Math.sin(time * 5) * 0.24
-          : armorMotion === "pose"
-            ? -arm.side * 0.2
-            : 0.025;
-        arm.palm.rotation.z = waving ? Math.sin(time * 5) * 0.22 : 0;
-      }
-      for (const leg of articulatedLegs) {
-        leg.hip.rotation.x = armorMotion === "walk"
-          ? Math.sin(time * 5) * 0.34 * leg.side
-          : Math.sin(time * 1.2 + leg.side) * 0.012;
-        leg.knee.rotation.x = armorMotion === "walk"
-          ? Math.max(0, Math.sin(time * 5 + leg.side)) * 0.52
-          : 0.015;
-        leg.ankle.rotation.x = armorMotion === "walk"
-          ? -leg.knee.rotation.x * 0.35
-          : 0;
-      }
+      // DamagedHelmet turntable
+      helmetAnchor.rotation.y = time * 0.4;
 
-      updateHoloManipulation();
-
-      // Dum-E joint movement
-      lowerArm.rotation.z = Math.sin(time * 1.2) * 0.15;
-      upperArm.rotation.x = Math.cos(time * 0.8) * 0.2;
-      dume.rotation.y = Math.sin(time * 0.5) * 0.3;
-
-      for (let i = 0; i < vehicleLights.length; i++) {
-        vehicleLights[i].intensity = 2.1 + Math.sin(time * 1.8 + i) * 0.25;
-      }
-      for (let i = 0; i < ceilingLights.length; i++) {
-        ceilingLights[i].intensity = 1.7 + Math.sin(time * 0.7 + i * 0.4) * 0.08;
-      }
-
-      hudPlane.lookAt(camera.position);
-
-      // Plasma torch beam jitter
-      if (toolGroup.userData.isFiring) {
-        beam.scale.set(
-          1.0 + Math.sin(time * 45) * 0.25,
-          1.0 + Math.cos(time * 45) * 0.25,
-          1.0
-        );
-      }
-
-      renderer.render(scene, camera);
+      composer.render();
     });
 
     // -------------------------------------------------------------
-    // 16. INITIALIZATION & AUDIO UNLOCK
+    // 17. INITIALIZATION TRIGGER & AUDIO UNLOCK
     // -------------------------------------------------------------
     document.getElementById('init-btn').addEventListener('click', async () => {
-      // Resume Web Audio Context (Satisfies browser autoplay policy)
       if (audioCtx.state === 'suspended') {
         await audioCtx.resume();
       }
 
       initBuffers();
       initSpeechEngine();
+      drawTerminalUI();
 
       // Start ambient holotable hum
       tableAudio.setBuffer(bufHoloHum);
@@ -1632,8 +1040,9 @@
       tableAudio.setVolume(0.5);
       tableAudio.play();
 
-      jarvisSpeak("Workshop spatial audio systems active. Welcome home, sir.");
-      document.getElementById('launch-overlay').style.display = 'none';
+      jarvisSpeak("Welcome back, sir. Hall of Armor and command terminal are online.");
+      document.getElementById('status-pill').textContent = 'J.A.R.V.I.S. online — systems nominal.';
+      document.getElementById('init-overlay').style.display = 'none';
       document.body.appendChild(VRButton.createButton(renderer));
     });
 
@@ -1641,6 +1050,7 @@
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
+      composer.setSize(window.innerWidth, window.innerHeight);
     });
   </script>
 </body>
