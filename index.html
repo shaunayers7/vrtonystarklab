@@ -88,6 +88,7 @@
     import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
     import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
     import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+    import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
     import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
     import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
     import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -387,16 +388,98 @@
     const bay3Data = alcoveCenters[3];
     const heroSuit = alcoveSuits[3];
 
-    // Auto-replace hero suit with suit.glb if uploaded to your repository
+    // --- LOAD REAL IRON MAN SUITS (.GLB) ---
+    // Both Sketchfab exports are raw Z-up meshes (~1818 units tall, identity
+    // transforms), so each gets a corrective wrap: rotate to Y-up, scale to ~1.82m.
+    // Falls back to the segmented procedural armor if a file is missing.
+    let holoIsGLB = false;
     const gltfLoader = new GLTFLoader();
-    gltfLoader.load('./suit.glb', (gltf) => {
-      scene.remove(heroSuit.root);
-      const loaded = gltf.scene;
-      loaded.position.copy(bay3Data.position);
-      loaded.rotation.y = bay3Data.rotation;
-      loaded.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-      scene.add(loaded);
-    }, undefined, () => {});
+    const SUIT_SCALE = 0.001;
+
+    function wrapSuitModel(model) {
+      model.rotation.x = -Math.PI / 2; // Z-up -> Y-up
+      model.scale.setScalar(SUIT_SCALE); // 1818 raw units -> ~1.82 m tall
+      return model;
+    }
+
+    function placeInAlcove(wrapper, bay) {
+      wrapper.position.copy(bay.position);
+      wrapper.rotation.y = bay.rotation;
+      wrapper.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+      scene.add(wrapper);
+    }
+
+    function jarvisIfReady(phrase) {
+      // Avoid cancelling the welcome line if models finish loading pre-init
+      if (document.getElementById('init-overlay').style.display === 'none') {
+        jarvisSpeak(phrase);
+      }
+    }
+
+    // HERO SUIT — center alcove + holographic clone above the workbench
+    gltfLoader.load(
+      './iron_man_mk7.glb',
+      (gltf) => {
+        // 1. PHYSICAL DISPLAY SUIT (Center Alcove Bay)
+        const physicalSuit = wrapSuitModel(gltf.scene);
+        scene.remove(heroSuit.root); // Retire the segmented placeholder
+        placeInAlcove(physicalSuit, bay3Data);
+
+        // 2. HOLOGRAPHIC CLONE (Above the workbench)
+        const holoClone = SkeletonUtils.clone(physicalSuit);
+        holoClone.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = false;
+            child.receiveShadow = false;
+            child.material = new THREE.MeshStandardMaterial({
+              color: 0x00f0ff,
+              emissive: 0x00f0ff,
+              emissiveIntensity: 0.65,
+              roughness: 0.1,
+              metalness: 0.9,
+              transparent: true,
+              opacity: 0.7,
+              wireframe: false
+            });
+          }
+        });
+        holoClone.position.set(0, 0, 0);
+        holoClone.rotation.set(0, 0, 0);
+        holoRig.remove(holoSuit.root); // Swap out the segmented hologram
+        holoRig.add(holoClone);
+        holoIsGLB = true;
+
+        jarvisIfReady("Armor telemetry synced. Mark Seven model online.");
+      },
+      (progress) => {
+        if (progress.total > 0) {
+          console.log(`Loading suit: ${(progress.loaded / progress.total * 100).toFixed(0)}%`);
+        }
+      },
+      (error) => {
+        console.error("Failed to load iron_man_mk7.glb:", error);
+      }
+    );
+
+    // SECOND SUIT — alcove right of the hero (bay 5)
+    const bay4Data = alcoveCenters[4];
+    gltfLoader.load(
+      './iron-man-mk7_2suit.glb',
+      (gltf) => {
+        scene.remove(alcoveSuits[4].root); // Retire the segmented placeholder
+        placeInAlcove(wrapSuitModel(gltf.scene), bay4Data);
+        jarvisIfReady("Mark Seven variant secured in bay five.");
+      },
+      undefined,
+      (error) => {
+        console.error("Failed to load iron-man-mk7_2suit.glb:", error);
+      }
+    );
 
     // DamagedHelmet display piece on a pedestal beside the workbench
     const helmetPedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 0.9, 24), materials.gunmetal);
@@ -994,22 +1077,24 @@
 
       handleInput(delta);
 
-      // Faceplate actuation
-      const targetMask = isMaskOpen ? 1.0 : 0.0;
-      maskProgress += (targetMask - maskProgress) * 0.12;
-      holoSuit.faceplate.position.y = 0.01 + maskProgress * 0.07;
-      holoSuit.faceplate.position.z = 0.08 - maskProgress * 0.02;
-      holoSuit.faceplate.rotation.x = -maskProgress * (Math.PI / 4);
+      // Faceplate & explode actuation (segmented fallback hologram only —
+      // the GLB hologram has no named faceplate/limb nodes to drive)
+      if (!holoIsGLB) {
+        const targetMask = isMaskOpen ? 1.0 : 0.0;
+        maskProgress += (targetMask - maskProgress) * 0.12;
+        holoSuit.faceplate.position.y = 0.01 + maskProgress * 0.07;
+        holoSuit.faceplate.position.z = 0.08 - maskProgress * 0.02;
+        holoSuit.faceplate.rotation.x = -maskProgress * (Math.PI / 4);
 
-      // Explode actuation
-      const targetExplode = isExploded ? 1.0 : 0.0;
-      explodeProgress += (targetExplode - explodeProgress) * 0.08;
-      holoSuit.helmet.position.y = 1.62 + explodeProgress * 0.18;
-      holoSuit.torso.position.z = explodeProgress * 0.08;
-      holoSuit.armL.position.x = -0.25 - explodeProgress * 0.15;
-      holoSuit.armR.position.x = 0.25 + explodeProgress * 0.15;
-      holoSuit.legL.position.y = 0.9 - explodeProgress * 0.14;
-      holoSuit.legR.position.y = 0.9 - explodeProgress * 0.14;
+        const targetExplode = isExploded ? 1.0 : 0.0;
+        explodeProgress += (targetExplode - explodeProgress) * 0.08;
+        holoSuit.helmet.position.y = 1.62 + explodeProgress * 0.18;
+        holoSuit.torso.position.z = explodeProgress * 0.08;
+        holoSuit.armL.position.x = -0.25 - explodeProgress * 0.15;
+        holoSuit.armR.position.x = 0.25 + explodeProgress * 0.15;
+        holoSuit.legL.position.y = 0.9 - explodeProgress * 0.14;
+        holoSuit.legR.position.y = 0.9 - explodeProgress * 0.14;
+      }
 
       // Idle life: gimbal spin, gentle hover bob, light flicker
       gimbalRing1.rotation.z = time * 0.3;
