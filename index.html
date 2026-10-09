@@ -383,24 +383,26 @@
     const gltfLoader = new GLTFLoader();
     const SUIT_SCALE = 0.0011;
 
-    function wrapSuitModel(model) {
-      const uprightModel = new THREE.Group();
-      uprightModel.rotation.x = -Math.PI / 2;
-      uprightModel.scale.setScalar(SUIT_SCALE);
-      uprightModel.add(model);
-      return uprightModel;
+    function createUprightSuit(model) {
+      const uprightSuit = new THREE.Group();
+      uprightSuit.rotation.x = -Math.PI / 2;
+      uprightSuit.scale.setScalar(SUIT_SCALE);
+      uprightSuit.add(model);
+      return uprightSuit;
     }
 
-    function placeInAlcove(wrapper, bay) {
-      wrapper.position.copy(bay.position);
-      wrapper.rotation.y = bay.rotation;
-      wrapper.traverse((child) => {
+    function placeInAlcove(uprightSuit, bay) {
+      const bayPlacement = new THREE.Group();
+      bayPlacement.position.copy(bay.position);
+      bayPlacement.rotation.y = bay.rotation;
+      bayPlacement.add(uprightSuit);
+      bayPlacement.traverse((child) => {
         if (child.isMesh) {
           child.castShadow = true;
           child.receiveShadow = true;
         }
       });
-      scene.add(wrapper);
+      scene.add(bayPlacement);
     }
 
     function jarvisIfReady(phrase) {
@@ -415,11 +417,11 @@
       './iron_man_mk7.glb',
       (gltf) => {
         // 1. PHYSICAL DISPLAY SUIT (Center Alcove Bay)
-        const physicalSuit = wrapSuitModel(SkeletonUtils.clone(gltf.scene));
+        const physicalSuit = createUprightSuit(SkeletonUtils.clone(gltf.scene));
         placeInAlcove(physicalSuit, bay3Data);
 
         // 2. HOLOGRAPHIC CLONE (Above the workbench)
-        const holoClone = wrapSuitModel(SkeletonUtils.clone(gltf.scene));
+        const holoClone = createUprightSuit(SkeletonUtils.clone(gltf.scene));
         holoClone.traverse((child) => {
           if (child.isMesh) {
             child.castShadow = false;
@@ -458,7 +460,7 @@
     gltfLoader.load(
       './iron-man-mk7_2suit.glb',
       (gltf) => {
-        placeInAlcove(wrapSuitModel(gltf.scene), bay4Data);
+        placeInAlcove(createUprightSuit(gltf.scene), bay4Data);
         jarvisIfReady("Mark Seven variant secured in bay five.");
       },
       undefined,
