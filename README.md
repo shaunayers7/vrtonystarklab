@@ -23,3 +23,5 @@ use the VR button to enter the lab in a headset.
   tablet modes or fire the torch.
 - Use voice commands such as "explode", "assemble", "red", "blue", "green", or
   "status" to control the holographic armor display.
+- Say "wave", "pose", "walk", or "neutral" to articulate the shoulder, elbow,
+  hip, and knee joints on the main powered-armor hologram.

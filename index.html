@@ -132,7 +132,7 @@
     <label for="holo-image-input">LOAD HOLOGRAM IMAGE</label>
     <input id="holo-image-input" type="file" accept="image/*" capture="environment" aria-label="Capture or load a hologram image" />
     <button id="restore-armor" type="button">RESTORE ARMOR</button>
-    <span id="holo-status" aria-live="polite">Powered armor ready. Load an image before entering VR.</span>
+    <span id="holo-status" aria-live="polite">Articulated armor ready. In VR, say “wave”, “pose”, “walk”, or “neutral”.</span>
   </div>
 
   <script type="module">
@@ -743,20 +743,6 @@
       });
     }
 
-    const helmetShellMat = new THREE.MeshStandardMaterial({
-      color: 0x8d2028,
-      emissive: 0x21080b,
-      emissiveIntensity: 0.35,
-      metalness: 0.78,
-      roughness: 0.22,
-      transparent: true,
-      opacity: 0.88,
-      clearcoat: 0.9
-    });
-    const helmetShell = new THREE.Mesh(new THREE.SphereGeometry(0.22, 18, 18), helmetShellMat);
-    helmetShell.scale.set(1.08, 1.35, 1.12);
-    helmetShell.position.y = 0.73;
-
     const arcCoreMat = makeHoloMat(0.9, false);
     const arcCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.08, 2), arcCoreMat);
     arcCore.position.set(0, 0.12, 0.2);
@@ -795,51 +781,126 @@
       transparent: true,
       opacity: 0.46
     });
-    function addArmorPiece(geometry, position, material = armorSurfaceMat, scale = null) {
+    function addArmorPiece(geometry, position, material = armorSurfaceMat, scale = null, parent = armorFigure) {
       const piece = new THREE.Mesh(geometry, material);
       piece.position.copy(position);
       if (scale) piece.scale.copy(scale);
-      armorFigure.add(piece);
+      parent.add(piece);
       const outline = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), armorLineMat);
       outline.position.copy(position);
       if (scale) outline.scale.copy(scale);
-      armorFigure.add(outline);
+      parent.add(outline);
       return piece;
     }
 
-    addArmorPiece(new THREE.BoxGeometry(0.62, 0.72, 0.34), new THREE.Vector3(0, 0.04, 0));
-    addArmorPiece(new THREE.SphereGeometry(0.34, 20, 14), new THREE.Vector3(0, 0.14, 0.12), armorDetailMat, new THREE.Vector3(1, 0.48, 0.32));
-    addArmorPiece(new THREE.BoxGeometry(0.48, 0.24, 0.3), new THREE.Vector3(0, -0.49, 0));
-    addArmorPiece(new THREE.CylinderGeometry(0.09, 0.11, 0.14, 16), new THREE.Vector3(0, 0.48, 0));
-    addArmorPiece(new THREE.SphereGeometry(0.18, 18, 12), new THREE.Vector3(0, 0.73, 0.02), armorDetailMat, new THREE.Vector3(1.05, 1.2, 0.92));
-    addArmorPiece(new THREE.BoxGeometry(0.2, 0.045, 0.035), new THREE.Vector3(0, 0.75, 0.19), new THREE.MeshBasicMaterial({ color: 0x9ffaff }));
+    const suitCoreMat = new THREE.MeshBasicMaterial({ color: 0x9ffaff });
+    const torsoGroup = new THREE.Group();
+    armorFigure.add(torsoGroup);
+    addArmorPiece(new THREE.CapsuleGeometry(0.28, 0.42, 8, 16), new THREE.Vector3(0, 0.04, 0), armorSurfaceMat, new THREE.Vector3(1.1, 1, 0.72), torsoGroup);
+    addArmorPiece(new THREE.SphereGeometry(0.31, 24, 16), new THREE.Vector3(0, 0.14, 0.12), armorDetailMat, new THREE.Vector3(1, 0.46, 0.3), torsoGroup);
+    addArmorPiece(new THREE.BoxGeometry(0.44, 0.18, 0.12), new THREE.Vector3(0, -0.29, 0.12), armorDetailMat, new THREE.Vector3(1, 0.65, 1), torsoGroup);
+    addArmorPiece(new THREE.CylinderGeometry(0.095, 0.11, 0.15, 20), new THREE.Vector3(0, 0.39, 0), armorDetailMat, null, torsoGroup);
+
+    const pelvisGroup = new THREE.Group();
+    pelvisGroup.position.y = -0.4;
+    torsoGroup.add(pelvisGroup);
+    addArmorPiece(new THREE.SphereGeometry(0.25, 20, 14), new THREE.Vector3(0, -0.02, 0), armorSurfaceMat, new THREE.Vector3(1.1, 0.56, 0.78), pelvisGroup);
+    addArmorPiece(new THREE.BoxGeometry(0.32, 0.08, 0.25), new THREE.Vector3(0, 0.04, 0.09), armorDetailMat, null, pelvisGroup);
+
+    const helmetGroup = new THREE.Group();
+    helmetGroup.position.y = 0.57;
+    torsoGroup.add(helmetGroup);
+    const helmetGoldMat = new THREE.MeshStandardMaterial({
+      color: 0xb58b47,
+      emissive: 0x291a08,
+      emissiveIntensity: 0.3,
+      metalness: 0.86,
+      roughness: 0.24,
+      transparent: true,
+      opacity: 0.92,
+      clearcoat: 1
+    });
+    addArmorPiece(new THREE.SphereGeometry(0.19, 24, 18), new THREE.Vector3(0, 0.15, 0), armorSurfaceMat, new THREE.Vector3(0.92, 1.18, 0.92), helmetGroup);
+    addArmorPiece(new THREE.SphereGeometry(0.16, 24, 16), new THREE.Vector3(0, 0.1, 0.075), helmetGoldMat, new THREE.Vector3(0.9, 0.54, 0.67), helmetGroup);
+    const visor = new THREE.Mesh(
+      new THREE.BoxGeometry(0.19, 0.025, 0.025),
+      new THREE.MeshBasicMaterial({ color: 0x9ffaff })
+    );
+    visor.position.set(0, 0.19, 0.168);
+    helmetGroup.add(visor);
+
+    const chestCore = new THREE.Mesh(new THREE.SphereGeometry(0.085, 20, 16), suitCoreMat);
+    chestCore.position.set(0, 0.12, 0.235);
+    torsoGroup.add(chestCore);
+    const chestRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.092, 0.012, 8, 32),
+      new THREE.MeshBasicMaterial({ color: 0x9ffaff })
+    );
+    chestRing.position.copy(chestCore.position);
+    torsoGroup.add(chestRing);
+
+    const articulatedArms = [];
+    const articulatedLegs = [];
 
     for (const side of [-1, 1]) {
-      addArmorPiece(
-        new THREE.SphereGeometry(0.2, 20, 16),
-        new THREE.Vector3(side * 0.43, 0.31, 0),
-        armorDetailMat,
-        new THREE.Vector3(1.1, 0.9, 0.9)
-      );
-      addArmorPiece(new THREE.CapsuleGeometry(0.11, 0.3, 6, 12), new THREE.Vector3(side * 0.57, 0.03, 0));
-      addArmorPiece(new THREE.CapsuleGeometry(0.13, 0.32, 6, 12), new THREE.Vector3(side * 0.62, -0.36, 0.01), armorDetailMat);
-      addArmorPiece(new THREE.SphereGeometry(0.12, 12, 10), new THREE.Vector3(side * 0.62, -0.65, 0.02));
-      addArmorPiece(new THREE.CapsuleGeometry(0.15, 0.36, 6, 12), new THREE.Vector3(side * 0.19, -0.78, 0));
-      addArmorPiece(new THREE.SphereGeometry(0.15, 12, 10), new THREE.Vector3(side * 0.19, -1.04, 0));
-      addArmorPiece(new THREE.CapsuleGeometry(0.12, 0.4, 6, 12), new THREE.Vector3(side * 0.19, -1.34, 0));
-      addArmorPiece(new THREE.BoxGeometry(0.32, 0.2, 0.42), new THREE.Vector3(side * 0.19, -1.62, 0.08), armorDetailMat);
+      const shoulder = new THREE.Group();
+      shoulder.position.set(side * 0.35, 0.27, 0);
+      torsoGroup.add(shoulder);
+      addArmorPiece(new THREE.SphereGeometry(0.19, 20, 16), new THREE.Vector3(0, -0.01, 0), armorDetailMat, new THREE.Vector3(1, 0.8, 0.9), shoulder);
+      addArmorPiece(new THREE.SphereGeometry(0.14, 16, 12), new THREE.Vector3(0, -0.15, 0), armorSurfaceMat, new THREE.Vector3(0.92, 1.2, 0.92), shoulder);
+
+      const upperArm = new THREE.Group();
+      upperArm.position.y = -0.2;
+      shoulder.add(upperArm);
+      addArmorPiece(new THREE.CapsuleGeometry(0.105, 0.27, 8, 14), new THREE.Vector3(0, -0.2, 0), armorSurfaceMat, new THREE.Vector3(1, 1, 0.85), upperArm);
+      addArmorPiece(new THREE.SphereGeometry(0.115, 16, 12), new THREE.Vector3(0, -0.4, 0), armorDetailMat, new THREE.Vector3(1, 0.65, 0.9), upperArm);
+
+      const elbow = new THREE.Group();
+      elbow.position.y = -0.42;
+      upperArm.add(elbow);
+      addArmorPiece(new THREE.SphereGeometry(0.09, 16, 12), new THREE.Vector3(0, 0, 0), armorDetailMat, null, elbow);
+
+      const forearm = new THREE.Group();
+      forearm.position.y = -0.05;
+      elbow.add(forearm);
+      addArmorPiece(new THREE.CapsuleGeometry(0.12, 0.27, 8, 14), new THREE.Vector3(0, -0.19, 0), armorDetailMat, new THREE.Vector3(1, 1, 0.88), forearm);
+      addArmorPiece(new THREE.BoxGeometry(0.16, 0.12, 0.18), new THREE.Vector3(0, -0.37, 0.01), armorSurfaceMat, null, forearm);
+      const palm = new THREE.Group();
+      palm.position.y = -0.41;
+      forearm.add(palm);
+      addArmorPiece(new THREE.SphereGeometry(0.085, 16, 12), new THREE.Vector3(0, -0.06, 0), armorSurfaceMat, new THREE.Vector3(1, 1.2, 0.75), palm);
+      const repulsor = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 10), suitCoreMat);
+      repulsor.position.set(0, -0.07, 0.07);
+      palm.add(repulsor);
+      articulatedArms.push({ side, shoulder, elbow, palm });
+
+      const hip = new THREE.Group();
+      hip.position.set(side * 0.17, -0.4, 0);
+      pelvisGroup.add(hip);
+      addArmorPiece(new THREE.SphereGeometry(0.14, 16, 12), new THREE.Vector3(0, -0.1, 0), armorDetailMat, new THREE.Vector3(1, 1.2, 0.9), hip);
+      addArmorPiece(new THREE.CapsuleGeometry(0.14, 0.32, 8, 14), new THREE.Vector3(0, -0.31, 0), armorSurfaceMat, new THREE.Vector3(1, 1, 0.88), hip);
+
+      const knee = new THREE.Group();
+      knee.position.y = -0.52;
+      hip.add(knee);
+      addArmorPiece(new THREE.SphereGeometry(0.13, 16, 12), new THREE.Vector3(0, 0, 0.025), armorDetailMat, new THREE.Vector3(1, 0.85, 0.7), knee);
+      const shin = new THREE.Group();
+      shin.position.y = -0.06;
+      knee.add(shin);
+      addArmorPiece(new THREE.CapsuleGeometry(0.115, 0.34, 8, 14), new THREE.Vector3(0, -0.22, 0), armorDetailMat, new THREE.Vector3(1, 1, 0.84), shin);
+      const boot = new THREE.Group();
+      boot.position.set(0, -0.43, 0.07);
+      shin.add(boot);
+      addArmorPiece(new THREE.SphereGeometry(0.16, 18, 12), new THREE.Vector3(0, -0.06, 0.04), armorSurfaceMat, new THREE.Vector3(0.88, 0.55, 1.3), boot);
+      articulatedLegs.push({ side, hip, knee, ankle: boot });
     }
 
-    const suitCoreMat = new THREE.MeshBasicMaterial({ color: holoColorHex });
-    const suitCore = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 12), suitCoreMat);
-    suitCore.position.set(0, 0.12, 0.23);
-    armorFigure.add(suitCore);
-
-    holoAssembly.add(armorFigure, helmetShell, arcCore, ring1, ring2);
+    holoAssembly.add(armorFigure, arcCore, ring1, ring2);
     scene.add(holoAssembly);
 
     let imageHolo = null;
     let activeHologram = holoAssembly;
+    let armorMotion = 'idle';
 
     // -------------------------------------------------------------
     // 9. STARKPAD TABLET + 3D POSITIONAL CHIME AUDIO
@@ -913,7 +974,8 @@
       disposeImageHolo();
       holoAssembly.visible = true;
       activeHologram = holoAssembly;
-      holoStatus.textContent = 'Powered armor restored. Squeeze near it to move; use both hands to resize and rotate.';
+      armorMotion = 'idle';
+      holoStatus.textContent = 'Powered armor restored. Say “wave”, “pose”, “walk”, or “neutral” to articulate it.';
     });
 
     const padGroup = new THREE.Group();
@@ -1189,15 +1251,27 @@
       } else if (text.includes("green")) {
         applyHoloColor(0x30d158);
         jarvisSpeak("Switching to diagnostic green.");
+      } else if (text.includes("wave")) {
+        armorMotion = "wave";
+        jarvisSpeak("Arm articulation online. Waving hello.");
+      } else if (text.includes("walk")) {
+        armorMotion = "walk";
+        jarvisSpeak("Walking motion engaged.");
+      } else if (text.includes("pose")) {
+        armorMotion = "pose";
+        jarvisSpeak("Setting the armor display pose.");
+      } else if (text.includes("stand") || text.includes("neutral") || text.includes("stop")) {
+        armorMotion = "idle";
+        jarvisSpeak("Returning to neutral stance.");
       } else if (text.includes("status") || text.includes("hello")) {
-        jarvisSpeak("Spatial acoustics and workshop tools are online, sir.");
+        jarvisSpeak("Workshop systems online. Say wave, pose, walk, or neutral to articulate the armor.");
       }
     }
 
     function applyHoloColor(hex) {
       holoLight.color.setHex(hex);
       emitterRing.material.color.setHex(hex);
-      [helmetShellMat, arcCoreMat, armorSurfaceMat, armorDetailMat].forEach(m => {
+      [arcCoreMat, armorSurfaceMat, armorDetailMat].forEach(m => {
         m.color.setHex(hex);
         m.emissive.setHex(hex);
       });
@@ -1477,10 +1551,40 @@
       const targetLerp = isExploded ? 1.0 : 0.0;
       explodeLerp += (targetLerp - explodeLerp) * 0.08;
 
-      helmetShell.position.y = 0.73 + explodeLerp * 0.35;
+      helmetGroup.position.y = 0.57 + explodeLerp * 0.35;
       ring1.position.y = 0.12 - explodeLerp * 0.2;
       ring2.position.y = 0.12 + explodeLerp * 0.45;
       arcCore.scale.setScalar(1.0 + explodeLerp * 0.4);
+
+      torsoGroup.rotation.z = armorMotion === "pose" ? 0.08 : Math.sin(time * 1.4) * 0.012;
+      for (const arm of articulatedArms) {
+        const waving = armorMotion === "wave" && arm.side === 1;
+        arm.shoulder.rotation.z = waving
+          ? 1.25 + Math.sin(time * 5) * 0.14
+          : armorMotion === "pose"
+            ? arm.side * 0.52
+            : armorMotion === "walk"
+              ? Math.sin(time * 5) * 0.22
+              : Math.sin(time * 1.2 + arm.side) * 0.025;
+        arm.shoulder.rotation.x = armorMotion === "pose" ? -0.12 : 0;
+        arm.elbow.rotation.z = waving
+          ? -0.85 + Math.sin(time * 5) * 0.24
+          : armorMotion === "pose"
+            ? -arm.side * 0.2
+            : 0.025;
+        arm.palm.rotation.z = waving ? Math.sin(time * 5) * 0.22 : 0;
+      }
+      for (const leg of articulatedLegs) {
+        leg.hip.rotation.x = armorMotion === "walk"
+          ? Math.sin(time * 5) * 0.34 * leg.side
+          : Math.sin(time * 1.2 + leg.side) * 0.012;
+        leg.knee.rotation.x = armorMotion === "walk"
+          ? Math.max(0, Math.sin(time * 5 + leg.side)) * 0.52
+          : 0.015;
+        leg.ankle.rotation.x = armorMotion === "walk"
+          ? -leg.knee.rotation.x * 0.35
+          : 0;
+      }
 
       updateHoloManipulation();
 
