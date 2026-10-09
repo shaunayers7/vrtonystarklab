@@ -101,14 +101,21 @@
     scene.background = new THREE.Color(0x020408);
     scene.fog = new THREE.FogExp2(0x020408, 0.028);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: false });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.xr.enabled = true;
+    renderer.xr.setFramebufferScaleFactor(0.85);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.xr.addEventListener('sessionstart', () => {
+      renderer.shadowMap.enabled = false;
+    });
+    renderer.xr.addEventListener('sessionend', () => {
+      renderer.shadowMap.enabled = true;
+    });
     document.body.appendChild(renderer.domElement);
 
     // -------------------------------------------------------------
@@ -985,11 +992,11 @@
 
     // Hand rigs — parented to cameraRig so they follow locomotion
     const hand0 = renderer.xr.getHand(0);
-    hand0.add(handFactory.createHandModel(hand0, 'mesh'));
+    hand0.add(handFactory.createHandModel(hand0, 'spheres'));
     cameraRig.add(hand0);
 
     const hand1 = renderer.xr.getHand(1);
-    hand1.add(handFactory.createHandModel(hand1, 'mesh'));
+    hand1.add(handFactory.createHandModel(hand1, 'spheres'));
     cameraRig.add(hand1);
 
     // Controllers
@@ -1240,7 +1247,11 @@
       // DamagedHelmet turntable
       helmetAnchor.rotation.y = time * 0.4;
 
-      composer.render();
+      if (renderer.xr.isPresenting) {
+        renderer.render(scene, camera);
+      } else {
+        composer.render();
+      }
     });
 
     // -------------------------------------------------------------
