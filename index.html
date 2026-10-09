@@ -75,7 +75,7 @@
   <div id="init-overlay">
     <h1>STARK INDUSTRIES // HALL OF ARMOR</h1>
     <p>
-      Click below to authorize <strong>J.A.R.V.I.S.</strong> and spatial audio. Sit comfortably, put on your Quest 3, and enter VR.
+      Sit comfortably in a stable chair; standing is not required. Use the left thumbstick to move around the lab. Initialize J.A.R.V.I.S., put on your Quest 3, and enter VR.
     </p>
     <button class="action-btn" id="init-btn">INITIALIZE LABORATORY</button>
     <div id="status-pill">Ready to initialize...</div>
@@ -105,6 +105,7 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.xr.enabled = true;
+    renderer.xr.setReferenceSpaceType('local-floor');
     renderer.xr.setFramebufferScaleFactor(0.85);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
@@ -511,13 +512,6 @@
     holoLight.position.set(0, 1.1, 0);
     workbenchGroup.add(holoLight);
 
-    // 3D Spatial Audio: continuous holotable hum
-    const tableAudio = new THREE.PositionalAudio(audioListener);
-    tableAudio.setRefDistance(1.2);
-    tableAudio.setMaxDistance(12);
-    tableAudio.setRolloffFactor(1.5);
-    workbenchGroup.add(tableAudio);
-
     scene.add(workbenchGroup);
 
     // -------------------------------------------------------------
@@ -700,25 +694,12 @@
       return buffer;
     }
 
-    function createHoloHumBuffer() {
-      const sampleRate = audioCtx.sampleRate;
-      const duration = 2.0;
-      const buffer = audioCtx.createBuffer(1, sampleRate * duration, sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < buffer.length; i++) {
-        const t = i / sampleRate;
-        data[i] = Math.sin(2 * Math.PI * 110 * t) * 0.08 + Math.sin(2 * Math.PI * 220 * t) * 0.03;
-      }
-      return buffer;
-    }
-
-    let bufChime, bufSurge, bufServo, bufGrab, bufHoloHum;
+    let bufChime, bufSurge, bufServo, bufGrab;
     function initBuffers() {
       bufChime = createChimeBuffer();
       bufSurge = createSurgeBuffer();
       bufServo = createServoBuffer();
       bufGrab = createGrabBuffer();
-      bufHoloHum = createHoloHumBuffer();
     }
 
     function playPositional(audio, buffer) {
@@ -1265,12 +1246,6 @@
       initBuffers();
       initSpeechEngine();
       drawTerminalUI();
-
-      // Start ambient holotable hum
-      tableAudio.setBuffer(bufHoloHum);
-      tableAudio.setLoop(true);
-      tableAudio.setVolume(0.5);
-      tableAudio.play();
 
       jarvisSpeak("Welcome back, sir. Hall of Armor and command terminal are online.");
       document.getElementById('status-pill').textContent = 'J.A.R.V.I.S. online — systems nominal.';

@@ -10,8 +10,10 @@ includes an original powered-armor hologram and full-body suit displays.
 Serve this folder over HTTPS (or from `localhost`) and open `index.html` in a
 WebXR-capable browser such as Meta Quest Browser on Quest 3. Select
 **Initialize Laboratory** to unlock the spatial audio and J.A.R.V.I.S. voice
-features, then use the VR button to enter the lab. The immersive renderer skips
-desktop bloom and shadows to keep headset rendering responsive.
+features, then use the VR button to enter the lab. The lab supports seated play;
+standing is not required. It uses the headset's floor-relative tracking and the
+left thumbstick for movement. The immersive renderer skips desktop bloom and
+shadows to keep headset rendering responsive.
 
 ## Interactions
 
