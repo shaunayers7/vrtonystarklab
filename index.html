@@ -302,6 +302,132 @@
     const roomFill = new THREE.AmbientLight(0xa8d4ff,.32);
     scene.add(roomFill);
 
+
+    // -------------------------------------------------------------
+    // 5B. JARVIS INTEGRATED WORKSHOP — FULL FUNCTIONAL BLOCKOUT
+    // Deliberately lightweight: world geometry and local UI, no live cloud actions.
+    // -------------------------------------------------------------
+    const blockoutRoot = new THREE.Group(); scene.add(blockoutRoot);
+    const blockoutTargets = []; // ray-interactable wall and workstation controls
+    const mkMat=(c, metal=.2)=>new THREE.MeshStandardMaterial({color:c,metalness:metal,roughness:.5});
+    const blockMetal=mkMat(0x273746,.55), blockDark=mkMat(0x101923), blockLight=mkMat(0x9bb2c8);
+    function block(parent,w,h,d,x,y,z,material=blockMetal){
+      const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);
+      m.position.set(x,y,z); parent.add(m);return m;
+    }
+    function signText(text,w=.9,h=.12,font=53,color='#effbff'){
+      const cv=document.createElement('canvas');cv.width=1024;cv.height=128;
+      const g=cv.getContext('2d');g.fillStyle=color;g.font=`bold ${font}px sans-serif`;
+      g.textAlign='center';g.textBaseline='middle';g.fillText(text,512,64,1000);
+      const tx=new THREE.CanvasTexture(cv);tx.colorSpace=THREE.SRGBColorSpace;
+      const p=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:tx,transparent:true,side:THREE.DoubleSide}));return p;
+    }
+    function signOn(parent,text,x,y,z,width=1.6,height=.2){
+      const sign=signText(text,width,height,57);sign.position.set(x,y,z);parent.add(sign);return sign;
+    }
+    // Exterior panorama seen through actual window openings. City blocks are placeholders.
+    const skyBackdrop=new THREE.Mesh(new THREE.PlaneGeometry(23,9),new THREE.MeshBasicMaterial({color:0x436884,side:THREE.DoubleSide}));
+    skyBackdrop.position.set(0,4.1,11);blockoutRoot.add(skyBackdrop);
+    const skylineMat=[mkMat(0x27394a),mkMat(0x384d5b),mkMat(0x50637a)];
+    for(let i=0;i<22;i++){
+      const height=1.6+(i*7%9)*.35;
+      block(blockoutRoot,.65+(i%3)*.14,height,.4,-10+i*.95,height/2,10.4,skylineMat[i%3]);
+    }
+    // Open window wall, with floor-to-ceiling glass and framing. Never blocks movement.
+    const glassMat=new THREE.MeshPhysicalMaterial({color:0x9dcce7,metalness:.05,roughness:.11,transparent:true,opacity:.2,side:THREE.DoubleSide,depthWrite:false});
+    const winFrame=mkMat(0x314655,.75);
+    for(let i=0;i<5;i++){
+      const x=-7+i*3.5;
+      block(blockoutRoot,3.25,3.05,.035,x,2.15,8.35,glassMat);
+      block(blockoutRoot,.1,3.25,.13,x-1.7,2.15,8.35,winFrame);
+      block(blockoutRoot,.1,3.25,.13,x+1.7,2.15,8.35,winFrame);
+      block(blockoutRoot,3.4,.1,.15,x,3.75,8.35,winFrame);
+      block(blockoutRoot,3.4,.11,.17,x,.52,8.35,winFrame);
+    }
+    // Ceiling beams and economical light strips.
+    for(let x of [-7,0,7]){
+      block(blockoutRoot,.22,.18,15,x,4.7,.6,winFrame);
+      for(let z of [-4,1,6])block(blockoutRoot,.09,.045,2.7,x,4.56,z,new THREE.MeshBasicMaterial({color:0xc8f3ff}));
+    }
+    scene.add(new THREE.HemisphereLight(0xeaf6ff,0x25202b,.8));
+    const taskLight=new THREE.PointLight(0xe1f3ff,9,12,2);taskLight.position.set(0,3.9,4);scene.add(taskLight);
+    // Wall board system. Boards are real 3D objects; content represents app integration stubs.
+    const panelStatus={
+      '3D PRINTING':['P1S A — demo queue','P1S B — demo queue','Falcon 2 22W — demo queue','Filament inventory — demo'],
+      'BUSINESS':['Products / orders','Quotes and pricing','Customer catalogue','Sales overview'],
+      'LIFE TASKS':['Today and tomorrow','Calendar / reminders','Daily routines','Personal dashboard'],
+      'NOTES':['Jobsite memory','Room measurements','Materials / photos','Voice notes'],
+      'IDEAS':['New product sketches','Design research','MakerWorld concepts','Jarvis suggestions']
+    };
+    let selectedBoard='3D PRINTING';
+    const infoBoard=new THREE.Group();blockoutRoot.add(infoBoard);
+    infoBoard.position.set(0,2.05,3.2);
+    const infoFace=block(infoBoard,2.6,1.52,.06,0,0,0,blockDark);
+    infoFace.material=new THREE.MeshBasicMaterial({color:0x081724,transparent:true,opacity:.97,side:THREE.DoubleSide});
+    let infoLines=[];
+    function displayBoard(section){
+      selectedBoard=section;
+      infoLines.forEach(m=>infoBoard.remove(m)); infoLines=[];
+      const lines=['JARVIS // '+section,...panelStatus[section],'DEMO ONLY  •  DATA NOT CONNECTED'];
+      lines.forEach((t,i)=>{
+        const p=signText(t,2.4,i===0?.17:.13,i===0?54:44,i===0?'#77e5ff':'#f4fbff');
+        p.position.set(0,.55-i*.21,.06);infoBoard.add(p);infoLines.push(p);
+      });
+    }
+    displayBoard('3D PRINTING');
+    const walls=[
+      ['3D PRINTING',-7.7,1.9,-1.8,Math.PI/2],
+      ['BUSINESS',-7.7,1.9,1.4,Math.PI/2],
+      ['LIFE TASKS',7.7,1.9,-1.8,-Math.PI/2],
+      ['NOTES',7.7,1.9,1.4,-Math.PI/2],
+      ['IDEAS',0,1.9,7.35,Math.PI]
+    ];
+    walls.forEach(([name,x,y,z,rot])=>{
+      const group=new THREE.Group();group.position.set(x,y,z);group.rotation.y=rot;blockoutRoot.add(group);
+      block(group,2.65,1.7,.16,0,0,0,blockMetal);
+      block(group,2.48,1.48,.02,0,0,.09,new THREE.MeshBasicMaterial({color:0x0b2330}));
+      signOn(group,name,0,.53,.12,2.36,.21);
+      panelStatus[name].forEach((line,i)=>{
+        const label=signText(line,2.25,.14,45,'#d5f5ff');
+        label.position.set(0,.19-i*.25,.13);group.add(label);
+      });
+      const clickTarget=new THREE.Mesh(new THREE.PlaneGeometry(2.5,1.55),new THREE.MeshBasicMaterial({visible:false,side:THREE.DoubleSide}));
+      clickTarget.position.z=.15;clickTarget.userData.action=()=>displayBoard(name);group.add(clickTarget);blockoutTargets.push(clickTarget);
+      const lamp=new THREE.PointLight(0x73dafa,.75,2.9);lamp.position.set(0,.35,.3);group.add(lamp);
+    });
+    // Executive desk + Jarvis command console; blockout placeholders with click actions.
+    const desk=new THREE.Group();desk.position.set(3.0,0,-4.45);blockoutRoot.add(desk);
+    block(desk,2.9,.13,1.3,0,.79,0,blockLight);
+    for(let x of [-1.2,1.2])for(let z of [-.5,.5])block(desk,.12,.75,.12,x,.37,z);
+    block(desk,1.5,.85,.06,0,1.37,-.42,new THREE.MeshBasicMaterial({color:0x10354d}));
+    signOn(desk,'JARVIS COMMAND',0,1.51,-.38,1.35,.14);
+    signOn(desk,'VOICE / APP / PROJECTS',0,1.25,-.37,1.34,.1);
+    const deskTap=new THREE.Mesh(new THREE.PlaneGeometry(1.65,.82),new THREE.MeshBasicMaterial({visible:false,side:THREE.DoubleSide}));
+    deskTap.position.set(0,1.36,-.35);deskTap.userData.action=()=>displayBoard('LIFE TASKS');desk.add(deskTap);blockoutTargets.push(deskTap);
+    // Maker corner with both P1S printers, 22W laser, labelled filament shelving.
+    const maker=new THREE.Group();maker.position.set(-4.4,0,-4.8);blockoutRoot.add(maker);
+    block(maker,5,.18,1.3,0,.85,0,blockLight);
+    for(let x of [-2.25,2.25])block(maker,.12,.78,1.12,x,.39,0);
+    function makerMachine(name,x,bodyColor){
+      const box=block(maker,1.05,.83,.95,x,1.35,0,mkMat(bodyColor,.35));
+      block(maker,.7,.52,.015,x,1.36,.49,new THREE.MeshBasicMaterial({color:0x142634}));
+      signOn(maker,name,x,1.89,.5,1.0,.12);return box;
+    }
+    makerMachine('BAMBU P1S A',-1.65,0x6f7e88);
+    makerMachine('BAMBU P1S B',-.4,0x6f7e88);
+    makerMachine('FALCON 2 22W',1.2,0x354750);
+    for(let y of [1,1.7,2.4])block(maker,1.15,.09,.65,2.15,y,-.8,blockMetal);
+    for(let i=0;i<9;i++){
+      const spool=new THREE.Mesh(new THREE.TorusGeometry(.13,.042,8,16),mkMat([0x44c7ff,0xf38d65,0xc98ee9,0xc5ced8][i%4]));
+      spool.position.set(1.79+i%3*.35,1.18+Math.floor(i/3)*.7,-.8);spool.rotation.x=Math.PI/2;maker.add(spool);
+    }
+    signOn(maker,'MAKER STATION',0,2.32,.02,2.8,.22);
+    // labelled wall to keep the blockout project scope visible in-headset
+    const entrySign=new THREE.Group();entrySign.position.set(0,2.4,5.55);entrySign.rotation.y=Math.PI;blockoutRoot.add(entrySign);
+    block(entrySign,2.8,.5,.07,0,0,0,blockMetal);
+    signOn(entrySign,'JARVIS VR  •  FUNCTIONAL PROTOTYPE',0,0,.055,2.7,.2);
+    // Clear task-console text is visible in a fixed world position; all integration is demo.
+
     // -------------------------------------------------------------
     // 6. SEGMENTED ARMOR CREATOR (Holographic fallback for the workbench rig)
     // -------------------------------------------------------------
@@ -1244,7 +1370,7 @@
       raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
 
       // 1. Interactive terminal buttons take priority
-      const hits = raycaster.intersectObjects(menuVisible ? menuButtons : (renderer.xr.isPresenting ? [] : clickableButtons.filter(b => !menuButtons.includes(b))), false);
+      const hits = raycaster.intersectObjects(menuVisible ? menuButtons : (renderer.xr.isPresenting ? blockoutTargets : [...blockoutTargets, ...clickableButtons.filter(b => !menuButtons.includes(b))]), false);
       if (hits.length > 0) {
         const hit = hits[0].object;
         if (hit.userData.action) {
