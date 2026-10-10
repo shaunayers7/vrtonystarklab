@@ -376,22 +376,38 @@
     const bay3Data = alcoveCenters[3];
 
     // --- LOAD REAL IRON MAN SUITS (.GLB) ---
-    // Both Sketchfab exports are raw Z-up meshes (~1818 units tall, identity
-    // transforms), so each instance gets its own upright correction and scale.
+    // The two uploaded models are Y-up but use different native units.
+    // Normalize each to a consistent real-world display height.
     // The hologram falls back to segmented procedural armor if the hero file is missing.
     let holoIsGLB = false;
     const gltfLoader = new GLTFLoader();
-    const SUIT_SCALE = 0.0011;
+    // Both uploaded GLB assets are Y-up, despite the older Z-up comment.
+    // Their native units differ significantly; normalize each to 1.85 m tall.
+    const SUIT_HEIGHT_METERS = 1.85;
     const suitSources = {};
     let activeModelName = 'armor1';
     let activeModel = null;
     let selectedKind = 'suit';
 
     function createUprightSuit(model) {
+      // Bounds are measured in the source model's own coordinates.
+      // Keep Y pointing upward; the former -90-degree X rotation caused
+      // both the alcove models and the workbench hologram to lie down.
+      model.updateMatrixWorld(true);
+      const bounds = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      const center = new THREE.Vector3();
+      bounds.getSize(size);
+      bounds.getCenter(center);
+      const scale = size.y > 0.001 ? SUIT_HEIGHT_METERS / size.y : 1;
       const uprightSuit = new THREE.Group();
-      uprightSuit.rotation.x = -Math.PI / 2;
-      uprightSuit.scale.setScalar(SUIT_SCALE);
-      uprightSuit.add(model);
+      const content = new THREE.Group();
+      model.position.x -= center.x;
+      model.position.y -= bounds.min.y;
+      model.position.z -= center.z;
+      content.add(model);
+      uprightSuit.scale.setScalar(scale);
+      uprightSuit.add(content);
       return uprightSuit;
     }
 
