@@ -382,6 +382,10 @@
     let holoIsGLB = false;
     const gltfLoader = new GLTFLoader();
     const SUIT_SCALE = 0.0011;
+    const suitSources = {};
+    let activeModelName = 'armor1';
+    let activeModel = null;
+    let selectedKind = 'suit';
 
     function createUprightSuit(model) {
       const uprightSuit = new THREE.Group();
@@ -420,6 +424,7 @@
         const physicalSuit = createUprightSuit(SkeletonUtils.clone(gltf.scene));
         placeInAlcove(physicalSuit, bay3Data);
 
+        suitSources.armor1 = gltf.scene;
         // 2. HOLOGRAPHIC CLONE (Above the workbench)
         const holoClone = createUprightSuit(SkeletonUtils.clone(gltf.scene));
         holoClone.traverse((child) => {
@@ -441,7 +446,12 @@
         holoClone.position.set(0, 0, 0);
         holoRig.remove(holoSuit.root); // Swap out the segmented hologram
         holoRig.add(holoClone);
-        holoIsGLB = true;
+        if (activeModelName === 'armor1') {
+          activeModel = holoClone;
+          holoIsGLB = true;
+        } else {
+          holoRig.remove(holoClone);
+        }
 
         jarvisIfReady("Armor telemetry synced. Mark Seven model online.");
       },
@@ -460,6 +470,7 @@
     gltfLoader.load(
       './iron-man-mk7_2suit.glb',
       (gltf) => {
+        suitSources.armor2 = gltf.scene;
         placeInAlcove(createUprightSuit(gltf.scene), bay4Data);
         jarvisIfReady("Mark Seven variant secured in bay five.");
       },
@@ -858,6 +869,114 @@
     terminalGroup.add(btnExit);
 
     // -------------------------------------------------------------
+    // 11A. HEADSET MODEL LIBRARY — ONE ACTIVE WORKBENCH MODEL
+    // -------------------------------------------------------------
+    const modelLibrary = [
+      ['armor1', 'IRON MAN MK7'], ['armor2', 'MK7 VARIANT'],
+      ['cube', 'CUBE'], ['sphere', 'SPHERE'], ['cylinder', 'CYLINDER'],
+      ['cone', 'CONE'], ['pyramid', 'PYRAMID'], ['torus', 'TORUS']
+    ];
+    let menuVisible = true;
+    const menuGroup = new THREE.Group();
+    scene.add(menuGroup);
+    menuGroup.visible = false;
+    const menuButtons = [];
+    const menuBg = new THREE.Mesh(new THREE.PlaneGeometry(0.64, 1.02),
+      new THREE.MeshBasicMaterial({ color: 0x061321, side: THREE.DoubleSide, transparent: true, opacity: 0.93 }));
+    menuGroup.add(menuBg);
+    function makeMenuRow(label, index, action) {
+      const y = 0.405 - index * 0.084;
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.073),
+        new THREE.MeshBasicMaterial({ color: index < 8 ? 0x13354a : 0x523044, side: THREE.DoubleSide }));
+      plate.position.set(0, y, 0.007);
+      plate.userData.action = action;
+      menuGroup.add(plate);
+      menuButtons.push(plate);
+      clickableButtons.push(plate);
+      const canvas = document.createElement('canvas');
+      canvas.width = 600; canvas.height = 80;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#e6fbff'; ctx.font = 'bold 34px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, 300, 40);
+      const caption = new THREE.Mesh(new THREE.PlaneGeometry(0.53, 0.066),
+        new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthWrite: false }));
+      caption.position.set(0, y, 0.012);
+      menuGroup.add(caption);
+    }
+    modelLibrary.forEach(([id, title], i) => makeMenuRow(title, i, () => loadWorkbenchModel(id)));
+    makeMenuRow('CLEAR / RESET', 8, () => loadWorkbenchModel(activeModelName));
+    makeMenuRow('CLOSE MENU', 9, () => setMenuVisible(false));
+    makeMenuRow('EXIT VR', 10, () => exitSimulation());
+    // Expand background to contain 11 selectable entries.
+    menuBg.geometry.dispose();
+    menuBg.geometry = new THREE.PlaneGeometry(0.64, 1.10);
+    function setMenuVisible(visible) {
+      menuVisible = visible;
+      menuGroup.visible = visible;
+      if (visible) positionMenuInFront();
+    }
+    function positionMenuInFront() {
+      if (!renderer.xr.isPresenting) return;
+      const xrCamera = renderer.xr.getCamera();
+      xrCamera.updateMatrixWorld(true);
+      const eye = new THREE.Vector3();
+      xrCamera.getWorldPosition(eye);
+      const facing = new THREE.Vector3();
+      xrCamera.getWorldDirection(facing);
+      facing.y = 0;
+      if (facing.lengthSq() < 0.001) facing.set(0, 0, -1);
+      facing.normalize();
+      menuGroup.position.copy(eye).addScaledVector(facing, 1.25);
+      menuGroup.position.y = eye.y - 0.18;
+      const yaw = Math.atan2(-facing.x, -facing.z);
+      menuGroup.rotation.set(0, yaw, 0);
+    }
+    function buildShape(id) {
+      const geometries = {
+        cube: () => new THREE.BoxGeometry(0.33, 0.33, 0.33),
+        sphere: () => new THREE.SphereGeometry(0.22, 32, 24),
+        cylinder: () => new THREE.CylinderGeometry(0.19, 0.19, 0.38, 32),
+        cone: () => new THREE.ConeGeometry(0.22, 0.42, 32),
+        pyramid: () => new THREE.ConeGeometry(0.26, 0.42, 4),
+        torus: () => new THREE.TorusGeometry(0.21, 0.075, 16, 40)
+      };
+      const mesh = new THREE.Mesh(geometries[id](), new THREE.MeshStandardMaterial({
+        color: 0x53c5e5, metalness: 0.48, roughness: 0.28
+      }));
+      return mesh;
+    }
+    function loadWorkbenchModel(id) {
+      activeModelName = id;
+      const isSuit = id === 'armor1' || id === 'armor2';
+      if (isSuit && !suitSources[id]) {
+        jarvisSpeak('That armour model is still loading. Please try again shortly.');
+        return;
+      }
+      if (activeModel) holoRig.remove(activeModel);
+      if (holoSuit.root.parent === holoRig) holoRig.remove(holoSuit.root);
+      if (isSuit) {
+        activeModel = createUprightSuit(SkeletonUtils.clone(suitSources[id]));
+        selectedKind = 'suit';
+      } else {
+        activeModel = buildShape(id);
+        selectedKind = 'shape';
+      }
+      holoRig.add(activeModel);
+      holoIsGLB = true;
+      holoRig.position.set(0, 1.12, 0);
+      holoBaseY = 1.12;
+      holoRig.rotation.set(0, 0, 0);
+      holoRig.scale.setScalar(isSuit ? 0.65 : 1.0);
+      setMenuVisible(false);
+    }
+    renderer.xr.addEventListener('sessionstart', () => {
+      // After WebXR has updated the pose, display the library ahead of the user.
+      requestAnimationFrame(() => setMenuVisible(true));
+    });
+    renderer.xr.addEventListener('sessionend', () => setMenuVisible(false));
+
+    // -------------------------------------------------------------
     // 12. SYSTEM CONTROLS (ACTUATION & EXIT)
     // -------------------------------------------------------------
     function toggleMask(state = !isMaskOpen) {
@@ -1036,7 +1155,7 @@
       raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
 
       // 1. Interactive terminal buttons take priority
-      const hits = raycaster.intersectObjects(clickableButtons, false);
+      const hits = raycaster.intersectObjects(menuVisible ? clickableButtons : clickableButtons.filter(b => !menuButtons.includes(b)), false);
       if (hits.length > 0) {
         const hit = hits[0].object;
         if (hit.userData.action) {
@@ -1122,6 +1241,7 @@
     // -------------------------------------------------------------
     const clock = new THREE.Clock();
 
+    const menuButtonLast = new WeakMap();
     function handleInput(delta) {
       const session = renderer.xr.getSession();
 
@@ -1137,8 +1257,9 @@
           forgeGroup.position.z += dz;
           forgeGroup.position.y = THREE.MathUtils.clamp(forgeGroup.position.y + dy, 1.0, 1.9);
         } else {
-          holoRig.rotation.y += dx * 4.0;
-          holoBaseY = THREE.MathUtils.clamp(holoBaseY + dy * 0.5, 0.7, 1.6);
+          holoRig.position.x = THREE.MathUtils.clamp(holoRig.position.x + dx, -1.1, 1.1);
+          holoRig.position.z = THREE.MathUtils.clamp(holoRig.position.z + dz, -1.1, 1.1);
+          holoBaseY = THREE.MathUtils.clamp(holoBaseY + dy, 0.65, 2.2);
         }
         dragState.moved += Math.abs(dx) + Math.abs(dy) + Math.abs(dz);
         dragState.lastPos.copy(pos);
@@ -1171,22 +1292,25 @@
         // Left Stick: Seated Gliding
         if (source.handedness === 'left' && (Math.abs(x) > 0.15 || Math.abs(y) > 0.15)) {
           const forward = new THREE.Vector3();
-          camera.getWorldDirection(forward);
+          renderer.xr.getCamera().getWorldDirection(forward);
           forward.y = 0;
           forward.normalize();
-          const right = new THREE.Vector3().crossVectors(camera.up, forward).negate().normalize();
+          const right = new THREE.Vector3(-forward.z, 0, forward.x).normalize();
 
           cameraRig.position.addScaledVector(forward, -y * 2.2 * delta);
           cameraRig.position.addScaledVector(right, x * 2.2 * delta);
         }
 
-        // Right Stick: Rotate and Scale suit
-        if (source.handedness === 'right') {
-          if (Math.abs(x) > 0.15) holoRig.rotation.y += x * 2.5 * delta;
-          if (Math.abs(y) > 0.15) {
-            const factor = THREE.MathUtils.clamp(1.0 - y * 1.0 * delta, 0.95, 1.05);
-            holoRig.scale.multiplyScalar(factor).clampScalar(0.25, 1.8);
-          }
+        // Right thumbstick rotates VIEW, not the workshop model.
+        if (source.handedness === 'right' && Math.abs(x) > 0.18) {
+          cameraRig.rotation.y -= x * 1.7 * delta;
+        }
+        // X/Y on left Quest controller toggles the library.
+        if (source.handedness === 'left') {
+          const pressed = !!(source.gamepad.buttons[4]?.pressed || source.gamepad.buttons[5]?.pressed);
+          const previous = menuButtonLast.get(source) || false;
+          if (pressed && !previous) setMenuVisible(!menuVisible);
+          menuButtonLast.set(source, pressed);
         }
       }
     }
