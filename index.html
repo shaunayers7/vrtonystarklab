@@ -99,16 +99,16 @@
     // -------------------------------------------------------------
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x020408);
-    scene.fog = new THREE.FogExp2(0x020408, 0.028);
+    scene.fog = new THREE.FogExp2(0x020408, 0.015);
 
     const renderer = new THREE.WebGLRenderer({ antialias: false });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.xr.enabled = true;
     renderer.xr.setReferenceSpaceType('local-floor');
-    renderer.xr.setFramebufferScaleFactor(0.85);
+    renderer.xr.setFramebufferScaleFactor(1.05);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
+    renderer.toneMappingExposure = 1.42;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.xr.addEventListener('sessionstart', () => {
@@ -154,10 +154,10 @@
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
 
-    const hemi = new THREE.HemisphereLight(0x8bdfff, 0x0a0e16, 0.5);
+    const hemi = new THREE.HemisphereLight(0xbbeaff, 0x283448, 1.25);
     scene.add(hemi);
 
-    const keyLight = new THREE.DirectionalLight(0xeaf6ff, 1.2);
+    const keyLight = new THREE.DirectionalLight(0xeaf6ff, 2.0);
     keyLight.position.set(-4, 8, 5);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.set(2048, 2048);
@@ -248,6 +248,59 @@
       scene.add(alcoveGroup);
       alcoveCenters.push({ group: alcoveGroup, position: new THREE.Vector3(x, 0.12, z), rotation: angle });
     }
+
+    // -------------------------------------------------------------
+    // PREMIUM VEHICLE SHOWROOM: TWO ILLUMINATED CONCEPT CAR DISPLAYS
+    // Lightweight procedural vehicles suitable for Quest rendering.
+    // -------------------------------------------------------------
+    function addConceptVehicle(cx, cz, paint) {
+      const bay = new THREE.Group();
+      bay.position.set(cx,0,cz);
+      bay.rotation.y = cx < 0 ? .28 : -.28;
+      scene.add(bay);
+      const black = new THREE.MeshStandardMaterial({color:0x090e15,metalness:.7,roughness:.22});
+      const alloy = new THREE.MeshStandardMaterial({color:0x9bb3c3,metalness:.9,roughness:.18});
+      const color = new THREE.MeshStandardMaterial({color:paint,metalness:.7,roughness:.19});
+      const glass = new THREE.MeshStandardMaterial({color:0x142e41,metalness:.7,roughness:.11});
+      const light = new THREE.MeshBasicMaterial({color:0xdafaff});
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(3.8,.14,2.35),black);
+      pad.position.y=.10; bay.add(pad);
+      for(const z of [-1.05,1.05]) {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(3.55,.023,.045),light);
+        rail.position.set(0,.18,z);bay.add(rail);
+      }
+      const base = new THREE.Mesh(new THREE.BoxGeometry(2.75,.36,1.35),color);
+      base.position.set(0,.62,0);bay.add(base);
+      const nose = new THREE.Mesh(new THREE.BoxGeometry(.75,.15,1.15),color);
+      nose.position.set(-1.17,.49,0);bay.add(nose);
+      const cab = new THREE.Mesh(new THREE.BoxGeometry(1.25,.38,1.08),glass);
+      cab.position.set(.23,.95,0);bay.add(cab);
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(1.18,.055,1.02),color);
+      roof.position.set(.23,1.16,0);bay.add(roof);
+      const rimGeo = new THREE.CylinderGeometry(.38,.38,.19,20);
+      for (const wheelX of [-.85,.92]) for (const wheelZ of [-.71,.71]) {
+        const wheel = new THREE.Mesh(rimGeo,black);
+        wheel.rotation.x = Math.PI/2;
+        wheel.position.set(wheelX,.46,wheelZ);bay.add(wheel);
+        const hub = new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,.2,16),alloy);
+        hub.rotation.x = Math.PI/2;
+        hub.position.copy(wheel.position);bay.add(hub);
+      }
+      for (const wheelZ of [-.45,.45]) {
+        const headlight = new THREE.Mesh(new THREE.BoxGeometry(.04,.07,.38),light);
+        headlight.position.set(-1.42,.63,wheelZ);bay.add(headlight);
+      }
+      const overhead = new THREE.SpotLight(0xb9eeff,26,9,Math.PI/3,.6,1.5);
+      overhead.position.set(0,4.5,0);
+      overhead.target.position.set(0,.4,0);
+      bay.add(overhead,overhead.target);
+      const floorGlow = new THREE.PointLight(0x27baff,2.5,4);
+      floorGlow.position.set(0,.3,0);bay.add(floorGlow);
+    }
+    addConceptVehicle(-4.1, 2.6, 0xb20e20);
+    addConceptVehicle(4.1, 2.6, 0x33475c);
+    const roomFill = new THREE.AmbientLight(0xa8d4ff,.32);
+    scene.add(roomFill);
 
     // -------------------------------------------------------------
     // 6. SEGMENTED ARMOR CREATOR (Holographic fallback for the workbench rig)
@@ -538,7 +591,7 @@
     emitterRing.position.y = 0.892;
     workbenchGroup.add(emitterRing);
 
-    const holoLight = new THREE.PointLight(0x00f0ff, 2.8, 3.5);
+    const holoLight = new THREE.PointLight(0x00f0ff, 3.4, 4.0);
     holoLight.position.set(0, 1.1, 0);
     workbenchGroup.add(holoLight);
 
@@ -771,6 +824,9 @@
     terminalGroup.add(termAudio);
 
     scene.add(terminalGroup);
+    // A single model/settings menu in VR. The older terminal remains desktop-only.
+    renderer.xr.addEventListener("sessionstart", () => { terminalGroup.visible = false; });
+    renderer.xr.addEventListener("sessionend", () => { terminalGroup.visible = true; });
 
     function drawTerminalUI() {
       termCtx.fillStyle = 'rgba(5, 12, 22, 0.95)';
@@ -892,61 +948,78 @@
       ['cube', 'CUBE'], ['sphere', 'SPHERE'], ['cylinder', 'CYLINDER'],
       ['cone', 'CONE'], ['pyramid', 'PYRAMID'], ['torus', 'TORUS']
     ];
-    let menuVisible = true;
+    let menuVisible = false;
+    let menuPositioned = false;
     const menuGroup = new THREE.Group();
     scene.add(menuGroup);
     menuGroup.visible = false;
     const menuButtons = [];
-    const menuBg = new THREE.Mesh(new THREE.PlaneGeometry(0.64, 1.02),
-      new THREE.MeshBasicMaterial({ color: 0x061321, side: THREE.DoubleSide, transparent: true, opacity: 0.93 }));
+    const menuWidth = 1.0, menuHeight = 0.82;
+    const menuBg = new THREE.Mesh(new THREE.PlaneGeometry(menuWidth, menuHeight),
+      new THREE.MeshBasicMaterial({ color: 0x071625, side: THREE.DoubleSide, transparent: true, opacity: 0.98, depthTest: false }));
     menuGroup.add(menuBg);
-    function makeMenuRow(label, index, action) {
-      const y = 0.405 - index * 0.084;
-      const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.073),
-        new THREE.MeshBasicMaterial({ color: index < 8 ? 0x13354a : 0x523044, side: THREE.DoubleSide }));
-      plate.position.set(0, y, 0.007);
+    const menuHeader = new THREE.Group();
+    function menuText(label, width, height, fontSize=48) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024; canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0,0,1024,128);
+      ctx.fillStyle = '#f0fcff'; ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, 512, 64);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width,height),
+        new THREE.MeshBasicMaterial({ map:tex, transparent:true, side:THREE.DoubleSide, depthTest:false }));
+      mesh.renderOrder = 10;
+      return mesh;
+    }
+    const heading = menuText('STARK // MODEL LIBRARY', .92, .072, 53);
+    heading.position.set(0, .352, .018);
+    menuGroup.add(heading);
+    function makeMenuRow(label,index,action) {
+      const col = index % 2, row = Math.floor(index/2);
+      const x = col ? .238 : -.238;
+      const y = .245 - row * .113;
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(.45,.093),
+        new THREE.MeshBasicMaterial({ color:index>=8?0x3d2b3c:0x15445a, side:THREE.DoubleSide, depthTest:false }));
+      plate.position.set(x,y,.025);
+      plate.renderOrder = 8;
       plate.userData.action = action;
       menuGroup.add(plate);
       menuButtons.push(plate);
       clickableButtons.push(plate);
-      const canvas = document.createElement('canvas');
-      canvas.width = 600; canvas.height = 80;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#e6fbff'; ctx.font = 'bold 34px sans-serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(label, 300, 40);
-      const caption = new THREE.Mesh(new THREE.PlaneGeometry(0.53, 0.066),
-        new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthWrite: false }));
-      caption.position.set(0, y, 0.012);
+      const caption = menuText(label,.438,.072,48);
+      caption.position.set(x,y,.03);
       menuGroup.add(caption);
     }
-    modelLibrary.forEach(([id, title], i) => makeMenuRow(title, i, () => loadWorkbenchModel(id)));
-    makeMenuRow('CLEAR / RESET', 8, () => loadWorkbenchModel(activeModelName));
-    makeMenuRow('CLOSE MENU', 9, () => setMenuVisible(false));
-    makeMenuRow('EXIT VR', 10, () => exitSimulation());
-    // Expand background to contain 11 selectable entries.
-    menuBg.geometry.dispose();
-    menuBg.geometry = new THREE.PlaneGeometry(0.64, 1.10);
+    modelLibrary.forEach(([id,title],i)=> makeMenuRow(title,i,()=>loadWorkbenchModel(id)));
+    makeMenuRow('RESET',8,()=>loadWorkbenchModel(activeModelName));
+    makeMenuRow('EXIT VR',9,()=>exitSimulation());
+    const dismiss = menuText('X/Y: OPEN or CLOSE  •  TRIGGER: SELECT',.94,.045,36);
+    dismiss.position.set(0,-.35,.017);
+    menuGroup.add(dismiss);
     function setMenuVisible(visible) {
       menuVisible = visible;
+      menuPositioned = !visible;
       menuGroup.visible = visible;
       if (visible) positionMenuInFront();
     }
     function positionMenuInFront() {
       if (!renderer.xr.isPresenting) return;
-      const xrCamera = renderer.xr.getCamera();
+      const xrCamera = renderer.xr.getCamera(camera);
       xrCamera.updateMatrixWorld(true);
       const eye = new THREE.Vector3();
       xrCamera.getWorldPosition(eye);
-      const facing = new THREE.Vector3();
-      xrCamera.getWorldDirection(facing);
+      const quaternion = new THREE.Quaternion();
+      xrCamera.getWorldQuaternion(quaternion);
+      const facing = new THREE.Vector3(0,0,-1).applyQuaternion(quaternion);
       facing.y = 0;
-      if (facing.lengthSq() < 0.001) facing.set(0, 0, -1);
+      if(facing.lengthSq()<.001) facing.set(0,0,-1);
       facing.normalize();
-      menuGroup.position.copy(eye).addScaledVector(facing, 1.25);
-      menuGroup.position.y = eye.y - 0.18;
-      const yaw = Math.atan2(-facing.x, -facing.z);
-      menuGroup.rotation.set(0, yaw, 0);
+      menuGroup.position.copy(eye).addScaledVector(facing,1.12);
+      menuGroup.position.y = eye.y - .04;
+      menuGroup.rotation.set(0,Math.atan2(-facing.x,-facing.z),0);
     }
     function buildShape(id) {
       const geometries = {
@@ -988,7 +1061,7 @@
     }
     renderer.xr.addEventListener('sessionstart', () => {
       // After WebXR has updated the pose, display the library ahead of the user.
-      requestAnimationFrame(() => setMenuVisible(true));
+      setMenuVisible(true);
     });
     renderer.xr.addEventListener('sessionend', () => setMenuVisible(false));
 
@@ -1171,7 +1244,7 @@
       raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
 
       // 1. Interactive terminal buttons take priority
-      const hits = raycaster.intersectObjects(menuVisible ? clickableButtons : clickableButtons.filter(b => !menuButtons.includes(b)), false);
+      const hits = raycaster.intersectObjects(menuVisible ? menuButtons : (renderer.xr.isPresenting ? [] : clickableButtons.filter(b => !menuButtons.includes(b))), false);
       if (hits.length > 0) {
         const hit = hits[0].object;
         if (hit.userData.action) {
@@ -1258,7 +1331,7 @@
     const clock = new THREE.Clock();
 
     const menuButtonLast = new WeakMap();
-    function handleInput(delta) {
+    function handleInput(delta, xrFrame) {
       const session = renderer.xr.getSession();
 
       // One-hand grab: near the forge you move shapes, near the suit you rotate it
@@ -1305,16 +1378,26 @@
         const x = Math.abs(axes[2]) > 0.05 ? axes[2] : (Math.abs(axes[0]) > 0.05 ? axes[0] : 0);
         const y = Math.abs(axes[3]) > 0.05 ? axes[3] : (Math.abs(axes[1]) > 0.05 ? axes[1] : 0);
 
-        // Left Stick: Seated Gliding
+        // Left thumbstick: move in the HMD's CURRENT facing direction, not
+        // the original room direction. Viewer pose is floor-local; apply rig yaw.
         if (source.handedness === 'left' && (Math.abs(x) > 0.15 || Math.abs(y) > 0.15)) {
-          const forward = new THREE.Vector3();
-          renderer.xr.getCamera().getWorldDirection(forward);
+          const facingQ = new THREE.Quaternion();
+          const referenceSpace = renderer.xr.getReferenceSpace();
+          const pose = xrFrame && referenceSpace ? xrFrame.getViewerPose(referenceSpace) : null;
+          if (pose) {
+            const q = pose.transform.orientation;
+            facingQ.set(q.x,q.y,q.z,q.w);
+            facingQ.premultiply(cameraRig.quaternion);
+          } else {
+            renderer.xr.getCamera(camera).getWorldQuaternion(facingQ);
+          }
+          const forward = new THREE.Vector3(0,0,-1).applyQuaternion(facingQ);
           forward.y = 0;
+          if (forward.lengthSq() < .001) forward.set(0,0,-1);
           forward.normalize();
-          const right = new THREE.Vector3(-forward.z, 0, forward.x).normalize();
-
-          cameraRig.position.addScaledVector(forward, -y * 2.2 * delta);
-          cameraRig.position.addScaledVector(right, x * 2.2 * delta);
+          const right = new THREE.Vector3(-forward.z,0,forward.x);
+          cameraRig.position.addScaledVector(forward,-y * 2.2 * delta);
+          cameraRig.position.addScaledVector(right,x * 2.2 * delta);
         }
 
         // Right thumbstick rotates VIEW, not the workshop model.
@@ -1334,11 +1417,12 @@
     // -------------------------------------------------------------
     // 16. MAIN ANIMATION LOOP
     // -------------------------------------------------------------
-    renderer.setAnimationLoop((timestamp) => {
+    renderer.setAnimationLoop((timestamp, xrFrame) => {
       const delta = clock.getDelta();
       const time = timestamp * 0.001;
 
-      handleInput(delta);
+      handleInput(delta, xrFrame);
+      if (menuVisible && renderer.xr.isPresenting && !menuPositioned) { positionMenuInFront(); menuPositioned=true; }
 
       // Faceplate & explode actuation (segmented fallback hologram only —
       // the GLB hologram has no named faceplate/limb nodes to drive)
