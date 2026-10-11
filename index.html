@@ -1152,7 +1152,7 @@
     const menuButtons = [];
     const menuPages = {library:new THREE.Group(), settings:new THREE.Group(), guide:new THREE.Group()};
     const menuPageButtons = {library:[], settings:[], guide:[]};
-    const menuWidth = 1.12, menuHeight = 0.98;
+    const menuWidth = 1.42, menuHeight = 1.23;
     const menuBg = new THREE.Mesh(new THREE.PlaneGeometry(menuWidth,menuHeight),
       new THREE.MeshBasicMaterial({color:0x061522,side:THREE.DoubleSide,transparent:true,opacity:.98,depthTest:false}));
     menuBg.renderOrder=7;menuGroup.add(menuBg);
@@ -1180,24 +1180,24 @@
     }
     for(const [pg,title] of [
       ['library','STARK // MODEL LIBRARY'],['settings','VIEW / INTERACTION SETTINGS'],
-      ['guide','HOW TO USE YOUR HANDS']
-    ]) addMenuText(pg,title,0,.406,1.03,.075,53);
+      ['guide','JARVIS // CONTROLS']
+    ]) addMenuText(pg,title,0,.535,1.31,.095,60);
     function makeMenuRow(page,label,index,action) {
       const col=index%2,row=Math.floor(index/2);
-      const x=col?.268:-.268, y=.292-row*.142;
-      const plate=new THREE.Mesh(new THREE.PlaneGeometry(.508,.115),
+      const x=col?.325:-.325, y=.36-row*.18;
+      const plate=new THREE.Mesh(new THREE.PlaneGeometry(.60,.145),
         new THREE.MeshBasicMaterial({color:0x164b65,side:THREE.DoubleSide,depthTest:false}));
       plate.position.set(x,y,.023); plate.renderOrder=8;
       plate.userData.action=action;
       menuPages[page].add(plate);
       menuPageButtons[page].push(plate);
       menuButtons.push(plate);
-      addMenuText(page,label,x,y,.492,.079,48);
+      addMenuText(page,label,x,y,.58,.095,53);
     }
     modelLibrary.forEach(([id,title],i)=>makeMenuRow('library',title,i,()=>loadWorkbenchModel(id)));
     makeMenuRow('library','SETTINGS / HELP',8,()=>showMenuPage('settings'));
     makeMenuRow('library','EXIT VR',9,()=>exitSimulation());
-    addMenuText('library','X/Y: MENU  |  TRIGGER OR PINCH: SELECT',0,-.426,1.04,.05,35);
+    addMenuText('library','X/Y: MENU   |   LEFT PINKY PINCH: MENU',0,-.52,1.32,.065,40);
     makeMenuRow('settings','SEATED VIEW',0,()=>changeEyeMode('seated'));
     makeMenuRow('settings','STANDING VIEW',1,()=>changeEyeMode('standing'));
     makeMenuRow('settings','EYE +10 CM',2,()=>changeEyeHeight(.10));
@@ -1208,25 +1208,25 @@
     makeMenuRow('settings','MODEL LIBRARY',7,()=>showMenuPage('library'));
     makeMenuRow('settings','RECENTER MENU',8,()=>positionMenuInFront());
     makeMenuRow('settings','EXIT VR',9,()=>exitSimulation());
-    addMenuText('settings','SEATED = STANDING-HEIGHT VIEW  |  STANDING = REAL HEIGHT',0,-.426,1.06,.04,30);
+    addMenuText('settings','SEATED / STANDING VIEW SETTINGS',0,-.52,1.30,.06,42);
     // A readable controller/hand guide lives INSIDE the headset.
     const guideLines=[
       '1  POINT your index finger toward a wall card',
       '2  TOUCH thumb to index finger (PINCH)',
-      '3  The card comes to you, smaller and readable',
-      '4  KEEP PINCHING to move it with your hand',
+      '3  The whole board comes to your workspace',
+      '4  KEEP PINCHING to move the board',
       '5  OPEN fingers to leave it floating in place',
-      'CONTROLLERS: AIM at card + HOLD GRIP to pull',
-      'X/Y: OPEN MENU   |   BOTH HANDS PINCH: MENU',
-      'SETTINGS: HEIGHT / RETURN CARDS / EXIT VR'
+      'CONTROLLER: AIM + HOLD GRIP to pull board',
+      'X/Y OR LEFT PINKY PINCH: OPEN MENU',
+      'LEFT THUMB + MIDDLE: MOVE FORWARD'
     ];
-    guideLines.forEach((line,i)=>addMenuText('guide',line,0,.293-i*.086,1.042,.062,41));
+    guideLines.forEach((line,i)=>addMenuText('guide',line,0,.37-i*.099,1.32,.077,45));
     function makeGuideButton(label,x,action){
       const plate=new THREE.Mesh(new THREE.PlaneGeometry(.49,.095),
         new THREE.MeshBasicMaterial({color:0x215c77,side:THREE.DoubleSide,depthTest:false}));
-      plate.position.set(x,-.397,.026);plate.renderOrder=8;plate.userData.action=action;
+      plate.position.set(x,-.49,.026);plate.renderOrder=8;plate.userData.action=action;
       menuPages.guide.add(plate);menuPageButtons.guide.push(plate);
-      addMenuText('guide',label,x,-.397,.46,.065,44);
+      addMenuText('guide',label,x,-.49,.46,.078,48);
     }
     makeGuideButton('MODEL LIBRARY',-.268,()=>showMenuPage('library'));
     makeGuideButton('HEIGHT SETTINGS',.268,()=>showMenuPage('settings'));
@@ -1252,8 +1252,8 @@
       facing.y=0;
       if(facing.lengthSq()<.001)facing.set(0,0,-1);
       facing.normalize();
-      menuGroup.position.copy(eye).addScaledVector(facing,1.27);
-      menuGroup.position.y=eye.y-.03;
+      menuGroup.position.copy(eye).addScaledVector(facing,1.65);
+      menuGroup.position.y=eye.y-.02;
       menuGroup.rotation.set(0,Math.atan2(-facing.x,-facing.z),0);
     }
     function buildShape(id) {
@@ -1464,6 +1464,9 @@
     const tmpJointPos2=new THREE.Vector3();
     const handPinchSince=new Map();
     let handsMenuLatch=false;
+    let handMenuStart=0;
+    let handMoveStart=0;
+    let handMoveActive=false;
     const handPointerBeams=[];
     for(let i=0;i<2;i++){
       const geometry=new THREE.BufferGeometry();
@@ -1611,14 +1614,23 @@
         if(!pinching){cardGrab.delete(hand);handPinchSince.delete(hand);}
         cardPinch.set(hand,pinching);
       }
-      // Hands-only menu shortcut: pinch BOTH hands for 0.6s while not holding cards.
-      const a=handPinchSince.get(hand0),b=handPinchSince.get(hand1);
-      if(a&&b&&cardGrab.size===0){
-        if(!handsMenuLatch&&performance.now()-Math.max(a,b)>.6*1000){
+      // No automatic menu opening from ordinary pinches.
+      // Hand-only menu: hold thumb to PINKY on the LEFT hand for 0.85s.
+      // This gesture is distinct from index/thumb grabbing.
+      const pinky=hand0.joints?.['pinky-finger-tip'];
+      const thumb0=hand0.joints?.['thumb-tip'];
+      const pinkyValid=pinky?.visible&&thumb0?.visible;
+      const pinkyDistance=pinkyValid?pinky.getWorldPosition(new THREE.Vector3()).distanceTo(thumb0.getWorldPosition(new THREE.Vector3())):1;
+      if(pinkyDistance<.029){
+        if(!handMenuStart)handMenuStart=performance.now();
+        if(!handsMenuLatch && performance.now()-handMenuStart>850){
           handsMenuLatch=true;
           setMenuVisible(!menuVisible);
         }
-      }else handsMenuLatch=false;
+      }else{
+        handMenuStart=0;
+        handsMenuLatch=false;
+      }
     }
     // Two-Hand Pinch & Pull tracker
     const grabState = {
@@ -1841,6 +1853,25 @@
 
       if(needsEyeCalibration && renderer.xr.isPresenting)applyEyeCalibration(xrFrame);
       handleInput(delta, xrFrame);
+      // Hands-only locomotion: hold LEFT thumb + MIDDLE fingertip to
+      // glide forward in the headset-facing direction. Release to stop.
+      // Separate from thumb + INDEX selection.
+      if(renderer.xr.isPresenting){
+        const thumb=hand0.joints?.['thumb-tip'], middle=hand0.joints?.['middle-finger-tip'];
+        const index=hand0.joints?.['index-finger-tip'];
+        if(thumb?.visible&&middle?.visible&&index?.visible){
+          const tp=thumb.getWorldPosition(new THREE.Vector3());
+          const md=middle.getWorldPosition(new THREE.Vector3());
+          const ix=index.getWorldPosition(new THREE.Vector3());
+          const moveGesture=tp.distanceTo(md)<.028 && tp.distanceTo(ix)>.05;
+          if(moveGesture && !menuVisible){
+            const quat=renderer.xr.getCamera(camera).getWorldQuaternion(new THREE.Quaternion());
+            const forward=new THREE.Vector3(0,0,-1).applyQuaternion(quat);
+            forward.y=0;forward.normalize();
+            cameraRig.position.addScaledVector(forward,Math.min(delta,.05)*1.55);
+          }
+        }
+      }
       if(renderer.xr.isPresenting){updateHandCardPinches();updateCardGrabs();}
       if (menuVisible && renderer.xr.isPresenting && (!menuPositioned || menuRepositionFrames>0)) { positionMenuInFront(); menuPositioned=true; if(menuRepositionFrames>0)menuRepositionFrames--; }
 
