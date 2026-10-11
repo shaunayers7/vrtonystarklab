@@ -75,7 +75,7 @@
   <div id="init-overlay">
     <h1>STARK INDUSTRIES // HALL OF ARMOR</h1>
     <p>
-      Sit comfortably in a stable chair; standing is not required. Use the left thumbstick to move around the lab. Initialize J.A.R.V.I.S., put on your Quest 3, and enter VR.
+      Sit or stand in a clear play area. Seated mode raises your virtual viewpoint. Left thumbstick moves, right thumbstick turns. Pinch at wall cards to pull them toward you; X/Y opens the in-headset gesture guide and height settings.
     </p>
     <button class="action-btn" id="init-btn">INITIALIZE LABORATORY</button>
     <div id="status-pill">Ready to initialize...</div>
@@ -123,8 +123,53 @@
     // 2. SEATED CAMERA RIG & AUDIO LISTENER
     // -------------------------------------------------------------
     const cameraRig = new THREE.Group();
-    cameraRig.position.set(0, 0, 1.35); // Ergonomic seated distance to table
+    cameraRig.position.set(0, 0, 1.35); // XR eye offset calibrated after headset tracking starts
     scene.add(cameraRig);
+
+    // Seated users can choose a virtual standing-height eye point without
+    // moving the physical floor, workbench, tracked controllers, or walls.
+    let eyeMode = 'seated';
+    let targetSeatedEyeHeight = 1.69;
+    let lastPhysicalEyeHeight = null;
+    let needsEyeCalibration = true;
+    function applyEyeCalibration(frame) {
+      if (!renderer.xr.isPresenting) return;
+      const refSpace = renderer.xr.getReferenceSpace();
+      const pose = frame && refSpace ? frame.getViewerPose(refSpace) : null;
+      if (pose) lastPhysicalEyeHeight = pose.transform.position.y;
+      if (eyeMode === 'standing') {
+        cameraRig.position.y = 0;
+        needsEyeCalibration = false;
+      } else if (lastPhysicalEyeHeight !== null) {
+        // In seated mode, the headset appears to be at normal standing eye level.
+        cameraRig.position.y = THREE.MathUtils.clamp(targetSeatedEyeHeight - lastPhysicalEyeHeight, -0.30, 1.30);
+        needsEyeCalibration = false;
+      }
+    }
+    function changeEyeMode(mode) {
+      eyeMode = mode;
+      needsEyeCalibration = true;
+      if (eyeMode === 'standing') cameraRig.position.y = 0;
+      else if (lastPhysicalEyeHeight !== null)
+        cameraRig.position.y = THREE.MathUtils.clamp(targetSeatedEyeHeight-lastPhysicalEyeHeight,-0.30,1.30);
+      if (renderer.xr.isPresenting && menuVisible) positionMenuInFront();
+    }
+    function changeEyeHeight(by) {
+      eyeMode = 'seated';
+      targetSeatedEyeHeight = THREE.MathUtils.clamp(targetSeatedEyeHeight+by,1.32,2.02);
+      needsEyeCalibration = true;
+      if (lastPhysicalEyeHeight !== null)
+        cameraRig.position.y = THREE.MathUtils.clamp(targetSeatedEyeHeight-lastPhysicalEyeHeight,-0.30,1.30);
+      if (renderer.xr.isPresenting && menuVisible) positionMenuInFront();
+    }
+    renderer.xr.addEventListener('sessionstart',()=>{
+      needsEyeCalibration = true;
+      lastPhysicalEyeHeight = null;
+    });
+    renderer.xr.addEventListener('sessionend',()=>{
+      cameraRig.position.y = 0;
+      lastPhysicalEyeHeight = null;
+    });
 
     const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 50);
     cameraRig.add(camera);
@@ -410,6 +455,10 @@
         const hit=new THREE.Mesh(new THREE.PlaneGeometry(2.27,.211),new THREE.MeshBasicMaterial({visible:false,side:THREE.DoubleSide}));
         hit.position.z=.025;card.add(hit);
         hit.userData.card=card;card.userData.board=group;
+        card.userData.homePosition=card.position.clone();
+        card.userData.homeQuaternion=card.quaternion.clone();
+        card.userData.homeScale=card.scale.clone();
+        card.userData.undocked=false;
         movableCards.push(card);movableCardHits.push(hit);
       });
       const clickTarget=new THREE.Mesh(new THREE.PlaneGeometry(2.5,1.55),new THREE.MeshBasicMaterial({visible:false,side:THREE.DoubleSide}));
@@ -1097,15 +1146,19 @@
     ];
     let menuVisible = false;
     let menuPositioned = false;
+    let menuRepositionFrames = 0;
+    let menuPage = 'guide';
     const menuGroup = new THREE.Group();
     scene.add(menuGroup);
     menuGroup.visible = false;
     const menuButtons = [];
-    const menuWidth = 1.0, menuHeight = 0.82;
-    const menuBg = new THREE.Mesh(new THREE.PlaneGeometry(menuWidth, menuHeight),
-      new THREE.MeshBasicMaterial({ color: 0x071625, side: THREE.DoubleSide, transparent: true, opacity: 0.98, depthTest: false }));
-    menuGroup.add(menuBg);
-    const menuHeader = new THREE.Group();
+    const menuPages = {library:new THREE.Group(), settings:new THREE.Group(), guide:new THREE.Group()};
+    const menuPageButtons = {library:[], settings:[], guide:[]};
+    const menuWidth = 1.12, menuHeight = 0.98;
+    const menuBg = new THREE.Mesh(new THREE.PlaneGeometry(menuWidth,menuHeight),
+      new THREE.MeshBasicMaterial({color:0x061522,side:THREE.DoubleSide,transparent:true,opacity:.98,depthTest:false}));
+    menuBg.renderOrder=7;menuGroup.add(menuBg);
+    for (const pg of Object.values(menuPages)) menuGroup.add(pg);
     function menuText(label, width, height, fontSize=48) {
       const canvas = document.createElement('canvas');
       canvas.width = 1024; canvas.height = 128;
@@ -1113,59 +1166,96 @@
       ctx.clearRect(0,0,1024,128);
       ctx.fillStyle = '#f0fcff'; ctx.font = `bold ${fontSize}px sans-serif`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(label, 512, 64);
+      ctx.fillText(label, 512, 64, 1000);
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width,height),
-        new THREE.MeshBasicMaterial({ map:tex, transparent:true, side:THREE.DoubleSide, depthTest:false }));
-      mesh.renderOrder = 10;
+        new THREE.MeshBasicMaterial({map:tex,transparent:true,side:THREE.DoubleSide,depthTest:false}));
+      mesh.renderOrder=10;
       return mesh;
     }
-    const heading = menuText('STARK // MODEL LIBRARY', .92, .072, 53);
-    heading.position.set(0, .352, .018);
-    menuGroup.add(heading);
-    function makeMenuRow(label,index,action) {
-      const col = index % 2, row = Math.floor(index/2);
-      const x = col ? .238 : -.238;
-      const y = .245 - row * .113;
-      const plate = new THREE.Mesh(new THREE.PlaneGeometry(.45,.093),
-        new THREE.MeshBasicMaterial({ color:index>=8?0x3d2b3c:0x15445a, side:THREE.DoubleSide, depthTest:false }));
-      plate.position.set(x,y,.025);
-      plate.renderOrder = 8;
-      plate.userData.action = action;
-      menuGroup.add(plate);
+    function addMenuText(page,label,x,y,w,h,font=49) {
+      const txt=menuText(label,w,h,font);
+      txt.position.set(x,y,.032);
+      menuPages[page].add(txt);
+      return txt;
+    }
+    for(const [pg,title] of [
+      ['library','STARK // MODEL LIBRARY'],['settings','VIEW / INTERACTION SETTINGS'],
+      ['guide','HOW TO USE YOUR HANDS']
+    ]) addMenuText(pg,title,0,.406,1.03,.075,53);
+    function makeMenuRow(page,label,index,action) {
+      const col=index%2,row=Math.floor(index/2);
+      const x=col?.268:-.268, y=.292-row*.142;
+      const plate=new THREE.Mesh(new THREE.PlaneGeometry(.508,.115),
+        new THREE.MeshBasicMaterial({color:0x164b65,side:THREE.DoubleSide,depthTest:false}));
+      plate.position.set(x,y,.023); plate.renderOrder=8;
+      plate.userData.action=action;
+      menuPages[page].add(plate);
+      menuPageButtons[page].push(plate);
       menuButtons.push(plate);
-      clickableButtons.push(plate);
-      const caption = menuText(label,.438,.072,48);
-      caption.position.set(x,y,.03);
-      menuGroup.add(caption);
+      addMenuText(page,label,x,y,.492,.079,48);
     }
-    modelLibrary.forEach(([id,title],i)=> makeMenuRow(title,i,()=>loadWorkbenchModel(id)));
-    makeMenuRow('RESET',8,()=>loadWorkbenchModel(activeModelName));
-    makeMenuRow('EXIT VR',9,()=>exitSimulation());
-    const dismiss = menuText('X/Y: OPEN or CLOSE  •  TRIGGER: SELECT',.94,.045,36);
-    dismiss.position.set(0,-.35,.017);
-    menuGroup.add(dismiss);
-    function setMenuVisible(visible) {
-      menuVisible = visible;
-      menuPositioned = !visible;
-      menuGroup.visible = visible;
-      if (visible) positionMenuInFront();
+    modelLibrary.forEach(([id,title],i)=>makeMenuRow('library',title,i,()=>loadWorkbenchModel(id)));
+    makeMenuRow('library','SETTINGS / HELP',8,()=>showMenuPage('settings'));
+    makeMenuRow('library','EXIT VR',9,()=>exitSimulation());
+    addMenuText('library','X/Y: MENU  |  TRIGGER OR PINCH: SELECT',0,-.426,1.04,.05,35);
+    makeMenuRow('settings','SEATED VIEW',0,()=>changeEyeMode('seated'));
+    makeMenuRow('settings','STANDING VIEW',1,()=>changeEyeMode('standing'));
+    makeMenuRow('settings','EYE +10 CM',2,()=>changeEyeHeight(.10));
+    makeMenuRow('settings','EYE -10 CM',3,()=>changeEyeHeight(-.10));
+    makeMenuRow('settings','RESET HEIGHT',4,()=>{targetSeatedEyeHeight=1.69;changeEyeMode('seated');});
+    makeMenuRow('settings','RETURN CARDS',5,()=>returnAllCards());
+    makeMenuRow('settings','GESTURE GUIDE',6,()=>showMenuPage('guide'));
+    makeMenuRow('settings','MODEL LIBRARY',7,()=>showMenuPage('library'));
+    makeMenuRow('settings','RECENTER MENU',8,()=>positionMenuInFront());
+    makeMenuRow('settings','EXIT VR',9,()=>exitSimulation());
+    addMenuText('settings','SEATED = STANDING-HEIGHT VIEW  |  STANDING = REAL HEIGHT',0,-.426,1.06,.04,30);
+    // A readable controller/hand guide lives INSIDE the headset.
+    const guideLines=[
+      '1  POINT your index finger toward a wall card',
+      '2  TOUCH thumb to index finger (PINCH)',
+      '3  The card comes to you, smaller and readable',
+      '4  KEEP PINCHING to move it with your hand',
+      '5  OPEN fingers to leave it floating in place',
+      'CONTROLLERS: AIM at card + HOLD GRIP to pull',
+      'X/Y: OPEN MENU   |   BOTH HANDS PINCH: MENU',
+      'SETTINGS: HEIGHT / RETURN CARDS / EXIT VR'
+    ];
+    guideLines.forEach((line,i)=>addMenuText('guide',line,0,.293-i*.086,1.042,.062,41));
+    function makeGuideButton(label,x,action){
+      const plate=new THREE.Mesh(new THREE.PlaneGeometry(.49,.095),
+        new THREE.MeshBasicMaterial({color:0x215c77,side:THREE.DoubleSide,depthTest:false}));
+      plate.position.set(x,-.397,.026);plate.renderOrder=8;plate.userData.action=action;
+      menuPages.guide.add(plate);menuPageButtons.guide.push(plate);
+      addMenuText('guide',label,x,-.397,.46,.065,44);
     }
-    function positionMenuInFront() {
-      if (!renderer.xr.isPresenting) return;
-      const xrCamera = renderer.xr.getCamera(camera);
+    makeGuideButton('MODEL LIBRARY',-.268,()=>showMenuPage('library'));
+    makeGuideButton('HEIGHT SETTINGS',.268,()=>showMenuPage('settings'));
+    function showMenuPage(page){
+      menuPage=page;
+      for (const [name,group] of Object.entries(menuPages)) group.visible=name===page;
+    }
+    function activeMenuButtons(){return menuPageButtons[menuPage];}
+    showMenuPage('guide');
+    function setMenuVisible(visible){
+      menuVisible=visible;
+      menuPositioned=!visible;
+      menuGroup.visible=visible;
+      if(visible) positionMenuInFront();
+    }
+    function positionMenuInFront(){
+      if(!renderer.xr.isPresenting)return;
+      const xrCamera=renderer.xr.getCamera(camera);
       xrCamera.updateMatrixWorld(true);
-      const eye = new THREE.Vector3();
-      xrCamera.getWorldPosition(eye);
-      const quaternion = new THREE.Quaternion();
-      xrCamera.getWorldQuaternion(quaternion);
-      const facing = new THREE.Vector3(0,0,-1).applyQuaternion(quaternion);
-      facing.y = 0;
-      if(facing.lengthSq()<.001) facing.set(0,0,-1);
+      const eye=new THREE.Vector3();xrCamera.getWorldPosition(eye);
+      const quaternion=new THREE.Quaternion();xrCamera.getWorldQuaternion(quaternion);
+      const facing=new THREE.Vector3(0,0,-1).applyQuaternion(quaternion);
+      facing.y=0;
+      if(facing.lengthSq()<.001)facing.set(0,0,-1);
       facing.normalize();
-      menuGroup.position.copy(eye).addScaledVector(facing,1.12);
-      menuGroup.position.y = eye.y - .04;
+      menuGroup.position.copy(eye).addScaledVector(facing,1.27);
+      menuGroup.position.y=eye.y-.03;
       menuGroup.rotation.set(0,Math.atan2(-facing.x,-facing.z),0);
     }
     function buildShape(id) {
@@ -1208,7 +1298,9 @@
     }
     renderer.xr.addEventListener('sessionstart', () => {
       // After WebXR has updated the pose, display the library ahead of the user.
+      showMenuPage('guide');
       setMenuVisible(true);
+      menuRepositionFrames=8;
     });
     renderer.xr.addEventListener('sessionend', () => setMenuVisible(false));
 
@@ -1364,76 +1456,170 @@
     const raycaster = new THREE.Raycaster();
     const tempMatrix = new THREE.Matrix4();
 
-    // Board card grabbing: controller grip selects with its aiming ray.
+    // Cards can be pulled OFF a wall and brought into a readable floating workspace.
+    // The source board retains each card's home transform so it can be returned.
     const cardRay=new THREE.Raycaster();
+    cardRay.far=8.0;
     const cardMatrix=new THREE.Matrix4();
     const tmpCardWorld=new THREE.Vector3();
-    function startCardGrab(source, card, pointWorld) {
-      const board=card.userData.board;
-      const local=board.worldToLocal(pointWorld.clone());
-      cardGrab.set(source,{card,offset:card.position.clone().sub(local)});
+    const tmpJointPos=new THREE.Vector3();
+    const tmpJointPos2=new THREE.Vector3();
+    const handPinchSince=new Map();
+    let handsMenuLatch=false;
+    const handPointerBeams=[];
+    for(let i=0;i<2;i++){
+      const geometry=new THREE.BufferGeometry();
+      geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(6),3));
+      const material=new THREE.LineBasicMaterial({color:0x60e8ff,transparent:true,opacity:.78,depthTest:false});
+      const beam=new THREE.Line(geometry,material);
+      beam.visible=false;beam.renderOrder=11;scene.add(beam);
+      handPointerBeams.push(beam);
     }
-    function gripCardStart(event) {
-      const controller=event.target;
+    function getSourcePoint(source){
+      const index=source.joints?.['index-finger-tip'];
+      const thumb=source.joints?.['thumb-tip'];
+      if(index&&thumb){
+        const a=new THREE.Vector3(),b=new THREE.Vector3();
+        index.getWorldPosition(a);thumb.getWorldPosition(b);
+        return a.add(b).multiplyScalar(.5);
+      }
+      return source.getWorldPosition(new THREE.Vector3());
+    }
+    function setRayFromController(controller){
       controller.updateMatrixWorld(true);
       cardMatrix.identity().extractRotation(controller.matrixWorld);
       cardRay.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-      cardRay.ray.direction.set(0,0,-1).applyMatrix4(cardMatrix);
-      const hits=cardRay.intersectObjects(movableCardHits,false);
-      if(hits.length){
-        // Project to the board's plane while following the controller ray.
-        const card=hits[0].object.userData.card;
-        cardGrab.set(controller,{card,offset:card.position.clone().sub(card.userData.board.worldToLocal(hits[0].point.clone()))});
-        return true;
-      }
+      cardRay.ray.direction.set(0,0,-1).applyMatrix4(cardMatrix).normalize();
+    }
+    function setRayFromHand(hand){
+      const tip=hand.joints?.['index-finger-tip'];
+      const proximal=hand.joints?.['index-finger-phalanx-proximal'];
+      if(!tip||!proximal||!tip.visible||!proximal.visible)return false;
+      tip.getWorldPosition(tmpJointPos);
+      proximal.getWorldPosition(tmpJointPos2);
+      const dir=tmpJointPos.clone().sub(tmpJointPos2);
+      if(dir.lengthSq()<.0001)return false;
+      cardRay.ray.origin.copy(tmpJointPos);
+      cardRay.ray.direction.copy(dir.normalize());
+      return true;
+    }
+    function cardIsHeld(card){
+      for(const v of cardGrab.values())if(v.card===card)return true;
       return false;
+    }
+    function startCardGrab(source,card){
+      if(cardIsHeld(card))return false;
+      if(!card.userData.undocked){
+        scene.attach(card);
+        const xrCamera=renderer.xr.getCamera(camera);
+        const eye=new THREE.Vector3(),quat=new THREE.Quaternion();
+        xrCamera.getWorldPosition(eye);xrCamera.getWorldQuaternion(quat);
+        const forward=new THREE.Vector3(0,0,-1).applyQuaternion(quat);
+        forward.y=0;if(forward.lengthSq()<.001)forward.set(0,0,-1);forward.normalize();
+        const right=new THREE.Vector3(-forward.z,0,forward.x);
+        const side=(source===hand0||source===c0)?-.22:.22;
+        card.position.copy(eye).addScaledVector(forward,.97).addScaledVector(right,side);
+        card.position.y=eye.y-.22;
+        card.rotation.set(0,Math.atan2(-forward.x,-forward.z),0);
+        card.scale.setScalar(.27);
+        card.userData.undocked=true;
+      }
+      cardGrab.set(source,{card,last:getSourcePoint(source)});
+      return true;
+    }
+    function gripCardStart(event){
+      if(menuVisible)return false;
+      const controller=event.target;
+      setRayFromController(controller);
+      const hits=cardRay.intersectObjects(movableCardHits,false);
+      return hits.length>0?startCardGrab(controller,hits[0].object.userData.card):false;
+    }
+    function returnAllCards(){
+      cardGrab.clear();
+      for(const card of movableCards){
+        if(!card.userData.undocked)continue;
+        const home=card.userData.board;
+        home.attach(card);
+        card.position.copy(card.userData.homePosition);
+        card.quaternion.copy(card.userData.homeQuaternion);
+        card.scale.copy(card.userData.homeScale);
+        card.userData.undocked=false;
+      }
     }
     function updateCardGrabs(){
       for(const [source,grab] of cardGrab){
-        const board=grab.card.userData.board;
-        let local;
-        if(source.isObject3D && source !== hand0 && source !== hand1){
-          source.updateMatrixWorld(true);
-          cardMatrix.identity().extractRotation(source.matrixWorld);
-          cardRay.ray.origin.setFromMatrixPosition(source.matrixWorld);
-          cardRay.ray.direction.set(0,0,-1).applyMatrix4(cardMatrix);
-          const planePoint=board.localToWorld(new THREE.Vector3(0,0,.17));
-          const planeNormal=new THREE.Vector3(0,0,1).transformDirection(board.matrixWorld);
-          const distance=new THREE.Plane().setFromNormalAndCoplanarPoint(planeNormal,planePoint);
-          const hit=cardRay.ray.intersectPlane(distance,tmpCardWorld);
-          if(!hit)continue;
-          local=board.worldToLocal(hit.clone());
-        } else {
-          const joint=source.joints?.['index-finger-tip'];
-          if(!joint)continue;
-          joint.getWorldPosition(tmpCardWorld);
-          local=board.worldToLocal(tmpCardWorld.clone());
+        const now=getSourcePoint(source);
+        const delta=now.sub(grab.last);
+        // Keep floating cards at a comfortable distance and above the floor.
+        if(delta.length()<.35){
+          grab.card.position.add(delta);
+          grab.card.position.y=THREE.MathUtils.clamp(grab.card.position.y,.65,2.7);
         }
-        grab.card.position.x=THREE.MathUtils.clamp(local.x+grab.offset.x,-.02,.02);
-        grab.card.position.y=THREE.MathUtils.clamp(local.y+grab.offset.y,-.47,.28);
-        grab.card.position.z=.15;
+        grab.last.copy(getSourcePoint(source));
       }
     }
+    function setHandBeam(i,ray,target){
+      const beam=handPointerBeams[i];
+      if(!target){beam.visible=false;return;}
+      const attr=beam.geometry.getAttribute('position');
+      attr.setXYZ(0,ray.origin.x,ray.origin.y,ray.origin.z);
+      attr.setXYZ(1,target.x,target.y,target.z);
+      attr.needsUpdate=true;beam.geometry.computeBoundingSphere();beam.visible=true;
+    }
     function updateHandCardPinches(){
-      for(const hand of [hand0,hand1]){
-        const thumb=hand.joints?.['thumb-tip'];
-        const index=hand.joints?.['index-finger-tip'];
-        if(!thumb||!index||!thumb.visible||!index.visible){cardGrab.delete(hand);cardPinch.set(hand,false);continue;}
-        const p=new THREE.Vector3(),q=new THREE.Vector3();
-        thumb.getWorldPosition(p);index.getWorldPosition(q);
-        const pinching=p.distanceTo(q)<.035;
-        if(pinching && !cardPinch.get(hand)){
-          let nearest=null,min=.33;
-          for(const card of movableCards){
-            card.getWorldPosition(tmpCardWorld);
-            const dist=q.distanceTo(tmpCardWorld);
-            if(dist<min){min=dist;nearest=card;}
-          }
-          if(nearest)startCardGrab(hand,nearest,q);
+      for(const [index,hand] of [hand0,hand1].entries()){
+        const thumb=hand.joints?.['thumb-tip'],tip=hand.joints?.['index-finger-tip'];
+        if(!thumb||!tip||!thumb.visible||!tip.visible){
+          cardGrab.delete(hand);cardPinch.set(hand,false);
+          handPinchSince.delete(hand);handPointerBeams[index].visible=false;continue;
         }
-        if(!pinching)cardGrab.delete(hand);
+        const a=thumb.getWorldPosition(new THREE.Vector3());
+        const b=tip.getWorldPosition(new THREE.Vector3());
+        const distance=a.distanceTo(b);
+        const previous=!!cardPinch.get(hand);
+        const pinching=previous?distance<.052:distance<.036;
+        const hasRay=setRayFromHand(hand);
+        let target=null,targetPoint=null;
+        if(hasRay){
+          const candidates=menuVisible?activeMenuButtons():movableCardHits;
+          const hits=cardRay.intersectObjects(candidates,false);
+          if(hits.length){target=hits[0].object;targetPoint=hits[0].point.clone();}
+        }
+        setHandBeam(index,cardRay.ray,targetPoint);
+        if(pinching&&!previous){
+          handPinchSince.set(hand,performance.now());
+          if(menuVisible){
+            let button=target;
+            if(!button){
+              // Touching a visible button directly also counts as a click.
+              for(const candidate of activeMenuButtons()){
+                candidate.getWorldPosition(tmpCardWorld);
+                if(tmpCardWorld.distanceTo(b)<.13){button=candidate;break;}
+              }
+            }
+            if(button?.userData.action)button.userData.action();
+          }else{
+            let selected=null,nearest=.23;
+            for(const card of movableCards){
+              card.getWorldPosition(tmpCardWorld);
+              const dist=b.distanceTo(tmpCardWorld);
+              if(dist<nearest){selected=card;nearest=dist;}
+            }
+            if(!selected&&target)selected=target.userData.card;
+            if(selected)startCardGrab(hand,selected);
+          }
+        }
+        if(!pinching){cardGrab.delete(hand);handPinchSince.delete(hand);}
         cardPinch.set(hand,pinching);
       }
+      // Hands-only menu shortcut: pinch BOTH hands for 0.6s while not holding cards.
+      const a=handPinchSince.get(hand0),b=handPinchSince.get(hand1);
+      if(a&&b&&cardGrab.size===0){
+        if(!handsMenuLatch&&performance.now()-Math.max(a,b)>.6*1000){
+          handsMenuLatch=true;
+          setMenuVisible(!menuVisible);
+        }
+      }else handsMenuLatch=false;
     }
     // Two-Hand Pinch & Pull tracker
     const grabState = {
@@ -1462,7 +1648,7 @@
       raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
 
       // 1. Interactive terminal buttons take priority
-      const hits = raycaster.intersectObjects(menuVisible ? menuButtons : (renderer.xr.isPresenting ? blockoutTargets : [...blockoutTargets, ...clickableButtons.filter(b => !menuButtons.includes(b))]), false);
+      const hits = raycaster.intersectObjects(menuVisible ? activeMenuButtons() : (renderer.xr.isPresenting ? blockoutTargets : [...blockoutTargets, ...clickableButtons.filter(b => !menuButtons.includes(b))]), false);
       if (hits.length > 0) {
         const hit = hits[0].object;
         if (hit.userData.action) {
@@ -1472,6 +1658,8 @@
           return;
         }
       }
+
+      if(menuVisible) return; // Never drag workshop models while using a floating menu.
 
       // 2. Forge pad proximity determines the gesture target
       const forgeWorld = new THREE.Vector3();
@@ -1533,6 +1721,7 @@
 
     // Grip on a wall task card grabs it; otherwise keep the existing armour gesture.
     function onSqueezeStart(event) {
+      if(menuVisible)return;
       if(gripCardStart(event))return;
       playPositional(event.target === c0 ? grabAudio0 : grabAudio1, bufGrab);
       toggleExplode();
@@ -1642,9 +1831,10 @@
       const delta = clock.getDelta();
       const time = timestamp * 0.001;
 
+      if(needsEyeCalibration && renderer.xr.isPresenting)applyEyeCalibration(xrFrame);
       handleInput(delta, xrFrame);
       if(renderer.xr.isPresenting){updateHandCardPinches();updateCardGrabs();}
-      if (menuVisible && renderer.xr.isPresenting && !menuPositioned) { positionMenuInFront(); menuPositioned=true; }
+      if (menuVisible && renderer.xr.isPresenting && (!menuPositioned || menuRepositionFrames>0)) { positionMenuInFront(); menuPositioned=true; if(menuRepositionFrames>0)menuRepositionFrames--; }
 
       // Faceplate & explode actuation (segmented fallback hologram only —
       // the GLB hologram has no named faceplate/limb nodes to drive)
