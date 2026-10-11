@@ -14,8 +14,14 @@ const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-per
 const vrButton=VRButton.createButton(renderer);
 vrButton.style.display='block';
 vrButton.style.zIndex='1000';
+vrButton.style.position='fixed';
+vrButton.style.bottom='24px';
+vrButton.style.left='50%';
+vrButton.style.transform='translateX(-50%)';
+vrButton.style.padding='14px 22px';
+vrButton.style.fontSize='18px';
 document.body.appendChild(vrButton);
-document.querySelector('#enter').remove();
+document.querySelector('#enter')?.remove();
 renderer.xr.addEventListener('sessionstart',()=>{document.querySelector('#hint').style.display='none';});
 renderer.xr.addEventListener('sessionend',()=>{document.querySelector('#hint').style.display='block';});
 scene.add(new THREE.HemisphereLight(0xddefff,0x4b5365,2.8));const sun=new THREE.DirectionalLight(0xffffff,3.0);sun.position.set(-5,10,5);scene.add(sun);
