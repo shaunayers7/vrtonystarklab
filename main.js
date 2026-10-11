@@ -9,7 +9,15 @@ const scene=new THREE.Scene();scene.background=new THREE.Color(0x172634);scene.f
 const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.04,100);camera.position.set(0,1.65,3.5);
 const rig=new THREE.Group();rig.add(camera);scene.add(rig);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.45;renderer.shadowMap.enabled=false;renderer.xr.enabled=true;renderer.xr.setReferenceSpaceType('local-floor');document.body.appendChild(renderer.domElement);
-const vrButton=VRButton.createButton(renderer);vrButton.style.display='none';document.body.appendChild(vrButton);document.querySelector('#enter').onclick=()=>vrButton.click();renderer.xr.addEventListener('sessionstart',()=>{document.querySelector('#enter').style.display='none';document.querySelector('#hint').style.display='none';});renderer.xr.addEventListener('sessionend',()=>{document.querySelector('#enter').style.display='block';document.querySelector('#hint').style.display='block';});
+// Use Three.js's native WebXR button directly. Proxy-clicking a hidden
+// button can fail browser user-activation requirements on Quest.
+const vrButton=VRButton.createButton(renderer);
+vrButton.style.display='block';
+vrButton.style.zIndex='1000';
+document.body.appendChild(vrButton);
+document.querySelector('#enter').remove();
+renderer.xr.addEventListener('sessionstart',()=>{document.querySelector('#hint').style.display='none';});
+renderer.xr.addEventListener('sessionend',()=>{document.querySelector('#hint').style.display='block';});
 scene.add(new THREE.HemisphereLight(0xddefff,0x4b5365,2.8));const sun=new THREE.DirectionalLight(0xffffff,3.0);sun.position.set(-5,10,5);scene.add(sun);
 const mat=(color,metalness=.2,roughness=.45)=>new THREE.MeshStandardMaterial({color,metalness,roughness});
 function box(w,h,d,m,x,y,z,parent=scene){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);parent.add(o);return o;}
