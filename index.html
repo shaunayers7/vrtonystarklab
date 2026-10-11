@@ -357,6 +357,7 @@
     const movableCards = []; // controller grip or hand pinch can move these locally on each board
     const movableCardHits = [];
     const cardGrab = new Map();
+    const boardFlights = new Map();
     const cardPinch = new Map();
     const mkMat=(c, metal=.2)=>new THREE.MeshStandardMaterial({color:c,metalness:metal,roughness:.5});
     const blockMetal=mkMat(0x273746,.55), blockDark=mkMat(0x101923), blockLight=mkMat(0x9bb2c8);
@@ -1150,8 +1151,8 @@
     scene.add(menuGroup);
     menuGroup.visible = false;
     const menuButtons = [];
-    const menuPages = {library:new THREE.Group(), settings:new THREE.Group(), guide:new THREE.Group()};
-    const menuPageButtons = {library:[], settings:[], guide:[]};
+    const menuPages = {library:new THREE.Group(), settings:new THREE.Group(), guide:new THREE.Group(), progress:new THREE.Group()};
+    const menuPageButtons = {library:[], settings:[], guide:[], progress:[]};
     const menuWidth = 1.42, menuHeight = 1.23;
     const menuBg = new THREE.Mesh(new THREE.PlaneGeometry(menuWidth,menuHeight),
       new THREE.MeshBasicMaterial({color:0x061522,side:THREE.DoubleSide,transparent:true,opacity:.98,depthTest:false}));
@@ -1180,7 +1181,7 @@
     }
     for(const [pg,title] of [
       ['library','STARK // MODEL LIBRARY'],['settings','VIEW / INTERACTION SETTINGS'],
-      ['guide','JARVIS // CONTROLS']
+      ['guide','JARVIS // CONTROLS'],['progress','JARVIS // BUILD ROADMAP']
     ]) addMenuText(pg,title,0,.535,1.31,.095,60);
     function makeMenuRow(page,label,index,action) {
       const col=index%2,row=Math.floor(index/2);
@@ -1208,6 +1209,8 @@
     makeMenuRow('settings','MODEL LIBRARY',7,()=>showMenuPage('library'));
     makeMenuRow('settings','RECENTER MENU',8,()=>positionMenuInFront());
     makeMenuRow('settings','EXIT VR',9,()=>exitSimulation());
+    makeMenuRow('settings','RESET MODEL',10,()=>resetWorkbenchModel());
+    makeMenuRow('settings','BUILD PROGRESS',11,()=>showMenuPage('progress'));
     addMenuText('settings','SEATED / STANDING VIEW SETTINGS',0,-.52,1.30,.06,42);
     // A readable controller/hand guide lives INSIDE the headset.
     const guideLines=[
@@ -1215,10 +1218,10 @@
       '2  TOUCH thumb to index finger (PINCH)',
       '3  The whole board comes to your workspace',
       '4  KEEP PINCHING to move the board',
-      '5  OPEN fingers to leave it floating in place',
+      '5  RELEASE pinch to leave the board floating',
       'CONTROLLER: AIM + HOLD GRIP to pull board',
       'X/Y OR LEFT PINKY PINCH: OPEN MENU',
-      'LEFT THUMB + MIDDLE: MOVE FORWARD'
+      'RIGHT THUMB + MIDDLE: AIM FLOOR / RELEASE TELEPORT'
     ];
     guideLines.forEach((line,i)=>addMenuText('guide',line,0,.37-i*.099,1.32,.077,45));
     function makeGuideButton(label,x,action){
@@ -1230,6 +1233,19 @@
     }
     makeGuideButton('MODEL LIBRARY',-.268,()=>showMenuPage('library'));
     makeGuideButton('HEIGHT SETTINGS',.268,()=>showMenuPage('settings'));
+    const progressLines=[
+      'BUILT  |  LARGE WORKSHOP + 2 IRON MAN MODELS',
+      'BUILT  |  FIVE DASHBOARDS + MODEL LIBRARY',
+      'BUILT  |  MODEL RESET TO UPRIGHT / HOME',
+      'TEST   |  CONTROLLER GRAB + TWO-HAND SCALE',
+      'TEST   |  HAND RAY / PINCH / TELEPORT',
+      'TEST   |  SMOOTH BOARD RETRIEVAL',
+      'TODO   |  PREMIUM UI + HAND GAUNTLETS',
+      'TODO   |  LIVE DATA + LIST EXTRACTION'
+    ];
+    progressLines.forEach((line,i)=>addMenuText('progress',line,0,.37-i*.10,1.32,.078,44));
+    makeMenuRow('progress','BACK TO GUIDE',8,()=>showMenuPage('guide'));
+    makeMenuRow('progress','RESET MODEL',9,()=>resetWorkbenchModel());
     function showMenuPage(page){
       menuPage=page;
       for (const [name,group] of Object.entries(menuPages)) group.visible=name===page;
@@ -1252,9 +1268,19 @@
       facing.y=0;
       if(facing.lengthSq()<.001)facing.set(0,0,-1);
       facing.normalize();
-      menuGroup.position.copy(eye).addScaledVector(facing,1.65);
+      menuGroup.position.copy(eye).addScaledVector(facing,1.45);
       menuGroup.position.y=eye.y-.02;
-      menuGroup.rotation.set(0,Math.atan2(-facing.x,-facing.z),0);
+      menuGroup.rotation.set(0,Math.atan2(facing.x,facing.z),0);
+    }
+    function resetWorkbenchModel(){
+      // Home transform for the active center model, regardless of its current pose.
+      dragState.active=false;dragState.controller=null;
+      grabState.h0Pinching=false;grabState.h1Pinching=false;
+      holoRig.position.set(0,1.12,0);
+      holoBaseY=1.12;
+      holoRig.quaternion.identity();
+      holoRig.scale.setScalar(holoIsGLB ? .65 : 1.0);
+      forgeGroup.quaternion.identity();
     }
     function buildShape(id) {
       const geometries = {
@@ -1519,10 +1545,10 @@
         forward.y=0;if(forward.lengthSq()<.001)forward.set(0,0,-1);forward.normalize();
         const right=new THREE.Vector3(-forward.z,0,forward.x);
         const side=(source===hand0||source===c0)?-.22:.22;
-        card.position.copy(eye).addScaledVector(forward,1.25).addScaledVector(right,side);
-        card.position.y=eye.y-.10;
-        card.rotation.set(0,Math.atan2(-forward.x,-forward.z),0);
-        card.scale.setScalar(.67);
+        const destination=eye.clone().addScaledVector(forward,1.25).addScaledVector(right,side);
+        destination.y=eye.y-.10;
+        const targetQ=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,Math.atan2(forward.x,forward.z),0));
+        boardFlights.set(card,{start:card.position.clone(),end:destination,fromQ:card.quaternion.clone(),toQ:targetQ,fromScale:card.scale.clone(),startTime:performance.now(),duration:850});
         card.userData.undocked=true;
       }
       cardGrab.set(source,{card,last:getSourcePoint(source)});
@@ -1536,7 +1562,7 @@
       return hits.length>0?startCardGrab(controller,hits[0].object.userData.card):false;
     }
     function returnAllCards(){
-      cardGrab.clear();
+      cardGrab.clear();boardFlights.clear();
       for(const card of movableCards){
         if(!card.userData.undocked)continue;
         const home=card.userData.board;
@@ -1549,6 +1575,7 @@
     }
     function updateCardGrabs(){
       for(const [source,grab] of cardGrab){
+        if(boardFlights.has(grab.card)){grab.last.copy(getSourcePoint(source));continue;}
         const now=getSourcePoint(source);
         const delta=now.sub(grab.last);
         // Keep floating cards at a comfortable distance and above the floor.
@@ -1631,6 +1658,41 @@
         handMenuStart=0;
         handsMenuLatch=false;
       }
+    }
+    // Right-hand thumb+middle pinch enters floor-target teleport mode.
+    // Index-thumb pinch remains exclusively for selecting/grabbing objects.
+    const teleportMarker=new THREE.Mesh(new THREE.RingGeometry(.16,.22,36),new THREE.MeshBasicMaterial({color:0x31ddff,side:THREE.DoubleSide,transparent:true,opacity:.85,depthTest:false}));
+    teleportMarker.rotation.x=-Math.PI/2;
+    teleportMarker.visible=false;teleportMarker.renderOrder=12;scene.add(teleportMarker);
+    let teleportHeld=false,teleportTarget=null;
+    function updateHandTeleport(){
+      const thumb=hand1.joints?.['thumb-tip'];
+      const middle=hand1.joints?.['middle-finger-tip'];
+      const index=hand1.joints?.['index-finger-tip'];
+      const valid=thumb?.visible&&middle?.visible&&index?.visible;
+      const a=new THREE.Vector3(),b=new THREE.Vector3(),i=new THREE.Vector3();
+      if(valid){thumb.getWorldPosition(a);middle.getWorldPosition(b);index.getWorldPosition(i);}
+      const held=!!valid && a.distanceTo(b)<.032 && a.distanceTo(i)>.055 && !menuVisible;
+      if(held){
+        const pointing=setRayFromHand(hand1);
+        if(pointing && cardRay.ray.direction.y<-.08){
+          const floorY=.04;
+          const distance=(floorY-cardRay.ray.origin.y)/cardRay.ray.direction.y;
+          if(distance>.3 && distance<9){
+            teleportTarget=cardRay.ray.at(distance,new THREE.Vector3());
+            teleportMarker.position.copy(teleportTarget);
+            teleportMarker.visible=true;
+          }else{teleportTarget=null;teleportMarker.visible=false;}
+        }else{teleportTarget=null;teleportMarker.visible=false;}
+      }else{
+        if(teleportHeld && teleportTarget){
+          const eye=renderer.xr.getCamera(camera).getWorldPosition(new THREE.Vector3());
+          const shift=teleportTarget.clone().sub(eye);shift.y=0;
+          cameraRig.position.add(shift);
+        }
+        teleportTarget=null;teleportMarker.visible=false;
+      }
+      teleportHeld=held;
     }
     // Two-Hand Pinch & Pull tracker
     const grabState = {
@@ -1853,24 +1915,15 @@
 
       if(needsEyeCalibration && renderer.xr.isPresenting)applyEyeCalibration(xrFrame);
       handleInput(delta, xrFrame);
-      // Hands-only locomotion: hold LEFT thumb + MIDDLE fingertip to
-      // glide forward in the headset-facing direction. Release to stop.
-      // Separate from thumb + INDEX selection.
-      if(renderer.xr.isPresenting){
-        const thumb=hand0.joints?.['thumb-tip'], middle=hand0.joints?.['middle-finger-tip'];
-        const index=hand0.joints?.['index-finger-tip'];
-        if(thumb?.visible&&middle?.visible&&index?.visible){
-          const tp=thumb.getWorldPosition(new THREE.Vector3());
-          const md=middle.getWorldPosition(new THREE.Vector3());
-          const ix=index.getWorldPosition(new THREE.Vector3());
-          const moveGesture=tp.distanceTo(md)<.028 && tp.distanceTo(ix)>.05;
-          if(moveGesture && !menuVisible){
-            const quat=renderer.xr.getCamera(camera).getWorldQuaternion(new THREE.Quaternion());
-            const forward=new THREE.Vector3(0,0,-1).applyQuaternion(quat);
-            forward.y=0;forward.normalize();
-            cameraRig.position.addScaledVector(forward,Math.min(delta,.05)*1.55);
-          }
-        }
+      // Hand-only movement is an explicit teleport gesture, not pointing.
+      if(renderer.xr.isPresenting) updateHandTeleport();
+      for(const [card,flight] of boardFlights){
+        const t=THREE.MathUtils.clamp((performance.now()-flight.startTime)/flight.duration,0,1);
+        const eased=t*t*(3-2*t);
+        card.position.lerpVectors(flight.start,flight.end,eased);
+        card.quaternion.copy(flight.fromQ).slerp(flight.toQ,eased);
+        card.scale.copy(flight.fromScale).lerp(new THREE.Vector3(.67,.67,.67),eased);
+        if(t>=1)boardFlights.delete(card);
       }
       if(renderer.xr.isPresenting){updateHandCardPinches();updateCardGrabs();}
       if (menuVisible && renderer.xr.isPresenting && (!menuPositioned || menuRepositionFrames>0)) { positionMenuInFront(); menuPositioned=true; if(menuRepositionFrames>0)menuRepositionFrames--; }
@@ -1896,7 +1949,7 @@
 
       // Idle life: gimbal spin, gentle hover bob, light flicker
       gimbalRing1.rotation.z = time * 0.3;
-      holoRig.position.y = holoBaseY + Math.sin(time * 1.2) * 0.025;
+      if(!dragState.active) holoRig.position.y = holoBaseY + Math.sin(time * 1.2) * 0.01;
       holoLight.intensity = 2.6 + Math.sin(time * 2.2) * 0.25;
 
       // Holo-forge: optional spin + emitter pad pulse
