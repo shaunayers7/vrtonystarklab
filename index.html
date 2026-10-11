@@ -98,8 +98,8 @@
     // 1. RENDERER & CINEMATIC PBR TONEMAPPING
     // -------------------------------------------------------------
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x020408);
-    scene.fog = new THREE.FogExp2(0x020408, 0.015);
+    scene.background = new THREE.Color(0x26384a);
+    scene.fog = new THREE.FogExp2(0x17222f, 0.004);
 
     const renderer = new THREE.WebGLRenderer({ antialias: false });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -108,7 +108,7 @@
     renderer.xr.setReferenceSpaceType('local-floor');
     renderer.xr.setFramebufferScaleFactor(1.05);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.42;
+    renderer.toneMappingExposure = 1.75;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.xr.addEventListener('sessionstart', () => {
@@ -154,10 +154,10 @@
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
 
-    const hemi = new THREE.HemisphereLight(0xbbeaff, 0x283448, 1.25);
+    const hemi = new THREE.HemisphereLight(0xbbeaff, 0x68788f, 2.0);
     scene.add(hemi);
 
-    const keyLight = new THREE.DirectionalLight(0xeaf6ff, 2.0);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 3.2);
     keyLight.position.set(-4, 8, 5);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.set(2048, 2048);
@@ -189,7 +189,7 @@
     const ARC_SPREAD = 0.9;
     const alcoveCenters = [];
 
-    const floor = new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 0.4, 48), materials.glossFloor);
+    const floor = new THREE.Mesh(new THREE.CylinderGeometry(24.5, 24.5, 0.4, 64), materials.glossFloor);
     floor.position.y = -0.2;
     floor.receiveShadow = true;
     scene.add(floor);
@@ -200,14 +200,14 @@
     );
     canopyCurve.rotation.x = Math.PI / 2;
     canopyCurve.rotation.z = Math.PI / 2 - ARC_SPREAD / 2;
-    canopyCurve.position.set(0, 3.4, -1.8);
+    canopyCurve.position.set(0, 3.4, -9.6);
     scene.add(canopyCurve);
 
     for (let i = 0; i < ALCOVE_COUNT; i++) {
       const t = (i / (ALCOVE_COUNT - 1)) - 0.5;
       const angle = t * ARC_SPREAD;
       const x = Math.sin(angle) * ARC_RADIUS;
-      const z = -Math.cos(angle) * ARC_RADIUS + 2.5;
+      const z = -Math.cos(angle) * ARC_RADIUS - 5.3;
 
       const alcoveGroup = new THREE.Group();
       alcoveGroup.position.set(x, 0, z);
@@ -297,9 +297,9 @@
       const floorGlow = new THREE.PointLight(0x27baff,2.5,4);
       floorGlow.position.set(0,.3,0);bay.add(floorGlow);
     }
-    addConceptVehicle(-4.1, 2.6, 0xb20e20);
-    addConceptVehicle(4.1, 2.6, 0x33475c);
-    const roomFill = new THREE.AmbientLight(0xa8d4ff,.32);
+    addConceptVehicle(-7.0, 3.2, 0xb20e20);
+    addConceptVehicle(7.0, 3.2, 0x33475c);
+    const roomFill = new THREE.AmbientLight(0xdceaff,1.2);
     scene.add(roomFill);
 
 
@@ -309,6 +309,10 @@
     // -------------------------------------------------------------
     const blockoutRoot = new THREE.Group(); scene.add(blockoutRoot);
     const blockoutTargets = []; // ray-interactable wall and workstation controls
+    const movableCards = []; // controller grip or hand pinch can move these locally on each board
+    const movableCardHits = [];
+    const cardGrab = new Map();
+    const cardPinch = new Map();
     const mkMat=(c, metal=.2)=>new THREE.MeshStandardMaterial({color:c,metalness:metal,roughness:.5});
     const blockMetal=mkMat(0x273746,.55), blockDark=mkMat(0x101923), blockLight=mkMat(0x9bb2c8);
     function block(parent,w,h,d,x,y,z,material=blockMetal){
@@ -326,31 +330,40 @@
       const sign=signText(text,width,height,57);sign.position.set(x,y,z);parent.add(sign);return sign;
     }
     // Exterior panorama seen through actual window openings. City blocks are placeholders.
-    const skyBackdrop=new THREE.Mesh(new THREE.PlaneGeometry(23,9),new THREE.MeshBasicMaterial({color:0x436884,side:THREE.DoubleSide}));
-    skyBackdrop.position.set(0,4.1,11);blockoutRoot.add(skyBackdrop);
+    const skyBackdrop=new THREE.Mesh(new THREE.PlaneGeometry(31,9),new THREE.MeshBasicMaterial({color:0x436884,side:THREE.DoubleSide}));
+    skyBackdrop.position.set(0,4.1,15.2);blockoutRoot.add(skyBackdrop);
     const skylineMat=[mkMat(0x27394a),mkMat(0x384d5b),mkMat(0x50637a)];
-    for(let i=0;i<22;i++){
+    for(let i=0;i<30;i++){
       const height=1.6+(i*7%9)*.35;
-      block(blockoutRoot,.65+(i%3)*.14,height,.4,-10+i*.95,height/2,10.4,skylineMat[i%3]);
+      block(blockoutRoot,.65+(i%3)*.14,height,.4,-14+i*.95,height/2,14.6,skylineMat[i%3]);
     }
     // Open window wall, with floor-to-ceiling glass and framing. Never blocks movement.
     const glassMat=new THREE.MeshPhysicalMaterial({color:0x9dcce7,metalness:.05,roughness:.11,transparent:true,opacity:.2,side:THREE.DoubleSide,depthWrite:false});
     const winFrame=mkMat(0x314655,.75);
-    for(let i=0;i<5;i++){
-      const x=-7+i*3.5;
-      block(blockoutRoot,3.25,3.05,.035,x,2.15,8.35,glassMat);
+    for(let i=0;i<7;i++){
+      const x=-10.5+i*3.5;
+      block(blockoutRoot,3.25,3.05,.035,x,2.15,12.5,glassMat);
       block(blockoutRoot,.1,3.25,.13,x-1.7,2.15,8.35,winFrame);
       block(blockoutRoot,.1,3.25,.13,x+1.7,2.15,8.35,winFrame);
-      block(blockoutRoot,3.4,.1,.15,x,3.75,8.35,winFrame);
-      block(blockoutRoot,3.4,.11,.17,x,.52,8.35,winFrame);
+      block(blockoutRoot,3.4,.1,.15,x,3.75,12.5,winFrame);
+      block(blockoutRoot,3.4,.11,.17,x,.52,12.5,winFrame);
     }
     // Ceiling beams and economical light strips.
-    for(let x of [-7,0,7]){
-      block(blockoutRoot,.22,.18,15,x,4.7,.6,winFrame);
-      for(let z of [-4,1,6])block(blockoutRoot,.09,.045,2.7,x,4.56,z,new THREE.MeshBasicMaterial({color:0xc8f3ff}));
+    for(let x of [-10,0,10]){
+      block(blockoutRoot,.22,.18,24,x,4.7,.6,winFrame);
+      for(let z of [-9,-4,1,6,11])block(blockoutRoot,.09,.045,2.7,x,4.56,z,new THREE.MeshBasicMaterial({color:0xffffff}));
     }
-    scene.add(new THREE.HemisphereLight(0xeaf6ff,0x25202b,.8));
-    const taskLight=new THREE.PointLight(0xe1f3ff,9,12,2);taskLight.position.set(0,3.9,4);scene.add(taskLight);
+    scene.add(new THREE.HemisphereLight(0xffffff,0x8597aa,1.3));
+    const taskLight=new THREE.PointLight(0xf4faff,16,23,2);taskLight.position.set(0,3.9,4);scene.add(taskLight);
+    // Bright, evenly distributed ceiling light banks. Low shadow cost for Quest.
+    const ceilingLightMat = new THREE.MeshBasicMaterial({color:0xf4fcff});
+    for (const x of [-9,-3,3,9]) for(const z of [-7,-1,5,10]) {
+      block(blockoutRoot,2.4,.055,.36,x,4.54,z,ceilingLightMat);
+    }
+    for(const x of [-9,0,9]) {
+      const light = new THREE.PointLight(0xffffff,7.5,17,2);
+      light.position.set(x,4.28,0);scene.add(light);
+    }
     // Wall board system. Boards are real 3D objects; content represents app integration stubs.
     const panelStatus={
       '3D PRINTING':['P1S A — demo queue','P1S B — demo queue','Falcon 2 22W — demo queue','Filament inventory — demo'],
@@ -376,11 +389,11 @@
     }
     displayBoard('3D PRINTING');
     const walls=[
-      ['3D PRINTING',-7.7,1.9,-1.8,Math.PI/2],
-      ['BUSINESS',-7.7,1.9,1.4,Math.PI/2],
-      ['LIFE TASKS',7.7,1.9,-1.8,-Math.PI/2],
-      ['NOTES',7.7,1.9,1.4,-Math.PI/2],
-      ['IDEAS',0,1.9,7.35,Math.PI]
+      ['3D PRINTING',-12.2,1.9,-5.3,Math.PI/2],
+      ['BUSINESS',-12.2,1.9,2.0,Math.PI/2],
+      ['LIFE TASKS',12.2,1.9,-5.3,-Math.PI/2],
+      ['NOTES',12.2,1.9,2.0,-Math.PI/2],
+      ['IDEAS',0,1.9,11.5,Math.PI]
     ];
     walls.forEach(([name,x,y,z,rot])=>{
       const group=new THREE.Group();group.position.set(x,y,z);group.rotation.y=rot;blockoutRoot.add(group);
@@ -388,15 +401,23 @@
       block(group,2.48,1.48,.02,0,0,.09,new THREE.MeshBasicMaterial({color:0x0b2330}));
       signOn(group,name,0,.53,.12,2.36,.21);
       panelStatus[name].forEach((line,i)=>{
-        const label=signText(line,2.25,.14,45,'#d5f5ff');
-        label.position.set(0,.19-i*.25,.13);group.add(label);
+        // Task cards are separate objects, keeping their text and backing together.
+        const card=new THREE.Group();card.position.set(0,.19-i*.25,.15);
+        group.add(card);
+        const bg=block(card,2.26,.205,.015,0,0,0,new THREE.MeshBasicMaterial({color:i%2?0x254454:0x1b3b4d}));
+        const label=signText(line,2.13,.137,48,'#f3fcff');
+        label.position.z=.014;card.add(label);
+        const hit=new THREE.Mesh(new THREE.PlaneGeometry(2.27,.211),new THREE.MeshBasicMaterial({visible:false,side:THREE.DoubleSide}));
+        hit.position.z=.025;card.add(hit);
+        hit.userData.card=card;card.userData.board=group;
+        movableCards.push(card);movableCardHits.push(hit);
       });
       const clickTarget=new THREE.Mesh(new THREE.PlaneGeometry(2.5,1.55),new THREE.MeshBasicMaterial({visible:false,side:THREE.DoubleSide}));
       clickTarget.position.z=.15;clickTarget.userData.action=()=>displayBoard(name);group.add(clickTarget);blockoutTargets.push(clickTarget);
       const lamp=new THREE.PointLight(0x73dafa,.75,2.9);lamp.position.set(0,.35,.3);group.add(lamp);
     });
     // Executive desk + Jarvis command console; blockout placeholders with click actions.
-    const desk=new THREE.Group();desk.position.set(3.0,0,-4.45);blockoutRoot.add(desk);
+    const desk=new THREE.Group();desk.position.set(4.7,0,-6.3);blockoutRoot.add(desk);
     block(desk,2.9,.13,1.3,0,.79,0,blockLight);
     for(let x of [-1.2,1.2])for(let z of [-.5,.5])block(desk,.12,.75,.12,x,.37,z);
     block(desk,1.5,.85,.06,0,1.37,-.42,new THREE.MeshBasicMaterial({color:0x10354d}));
@@ -405,7 +426,7 @@
     const deskTap=new THREE.Mesh(new THREE.PlaneGeometry(1.65,.82),new THREE.MeshBasicMaterial({visible:false,side:THREE.DoubleSide}));
     deskTap.position.set(0,1.36,-.35);deskTap.userData.action=()=>displayBoard('LIFE TASKS');desk.add(deskTap);blockoutTargets.push(deskTap);
     // Maker corner with both P1S printers, 22W laser, labelled filament shelving.
-    const maker=new THREE.Group();maker.position.set(-4.4,0,-4.8);blockoutRoot.add(maker);
+    const maker=new THREE.Group();maker.position.set(-5.0,0,-6.3);blockoutRoot.add(maker);
     block(maker,5,.18,1.3,0,.85,0,blockLight);
     for(let x of [-2.25,2.25])block(maker,.12,.78,1.12,x,.39,0);
     function makerMachine(name,x,bodyColor){
@@ -423,7 +444,7 @@
     }
     signOn(maker,'MAKER STATION',0,2.32,.02,2.8,.22);
     // labelled wall to keep the blockout project scope visible in-headset
-    const entrySign=new THREE.Group();entrySign.position.set(0,2.4,5.55);entrySign.rotation.y=Math.PI;blockoutRoot.add(entrySign);
+    const entrySign=new THREE.Group();entrySign.position.set(0,2.4,9.3);entrySign.rotation.y=Math.PI;blockoutRoot.add(entrySign);
     block(entrySign,2.8,.5,.07,0,0,0,blockMetal);
     signOn(entrySign,'JARVIS VR  •  FUNCTIONAL PROTOTYPE',0,0,.055,2.7,.2);
     // Clear task-console text is visible in a fixed world position; all integration is demo.
@@ -1343,6 +1364,77 @@
     const raycaster = new THREE.Raycaster();
     const tempMatrix = new THREE.Matrix4();
 
+    // Board card grabbing: controller grip selects with its aiming ray.
+    const cardRay=new THREE.Raycaster();
+    const cardMatrix=new THREE.Matrix4();
+    const tmpCardWorld=new THREE.Vector3();
+    function startCardGrab(source, card, pointWorld) {
+      const board=card.userData.board;
+      const local=board.worldToLocal(pointWorld.clone());
+      cardGrab.set(source,{card,offset:card.position.clone().sub(local)});
+    }
+    function gripCardStart(event) {
+      const controller=event.target;
+      controller.updateMatrixWorld(true);
+      cardMatrix.identity().extractRotation(controller.matrixWorld);
+      cardRay.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+      cardRay.ray.direction.set(0,0,-1).applyMatrix4(cardMatrix);
+      const hits=cardRay.intersectObjects(movableCardHits,false);
+      if(hits.length){
+        // Project to the board's plane while following the controller ray.
+        const card=hits[0].object.userData.card;
+        cardGrab.set(controller,{card,offset:card.position.clone().sub(card.userData.board.worldToLocal(hits[0].point.clone()))});
+        return true;
+      }
+      return false;
+    }
+    function updateCardGrabs(){
+      for(const [source,grab] of cardGrab){
+        const board=grab.card.userData.board;
+        let local;
+        if(source.isObject3D && source !== hand0 && source !== hand1){
+          source.updateMatrixWorld(true);
+          cardMatrix.identity().extractRotation(source.matrixWorld);
+          cardRay.ray.origin.setFromMatrixPosition(source.matrixWorld);
+          cardRay.ray.direction.set(0,0,-1).applyMatrix4(cardMatrix);
+          const planePoint=board.localToWorld(new THREE.Vector3(0,0,.17));
+          const planeNormal=new THREE.Vector3(0,0,1).transformDirection(board.matrixWorld);
+          const distance=new THREE.Plane().setFromNormalAndCoplanarPoint(planeNormal,planePoint);
+          const hit=cardRay.ray.intersectPlane(distance,tmpCardWorld);
+          if(!hit)continue;
+          local=board.worldToLocal(hit.clone());
+        } else {
+          const joint=source.joints?.['index-finger-tip'];
+          if(!joint)continue;
+          joint.getWorldPosition(tmpCardWorld);
+          local=board.worldToLocal(tmpCardWorld.clone());
+        }
+        grab.card.position.x=THREE.MathUtils.clamp(local.x+grab.offset.x,-.02,.02);
+        grab.card.position.y=THREE.MathUtils.clamp(local.y+grab.offset.y,-.47,.28);
+        grab.card.position.z=.15;
+      }
+    }
+    function updateHandCardPinches(){
+      for(const hand of [hand0,hand1]){
+        const thumb=hand.joints?.['thumb-tip'];
+        const index=hand.joints?.['index-finger-tip'];
+        if(!thumb||!index||!thumb.visible||!index.visible){cardGrab.delete(hand);cardPinch.set(hand,false);continue;}
+        const p=new THREE.Vector3(),q=new THREE.Vector3();
+        thumb.getWorldPosition(p);index.getWorldPosition(q);
+        const pinching=p.distanceTo(q)<.035;
+        if(pinching && !cardPinch.get(hand)){
+          let nearest=null,min=.33;
+          for(const card of movableCards){
+            card.getWorldPosition(tmpCardWorld);
+            const dist=q.distanceTo(tmpCardWorld);
+            if(dist<min){min=dist;nearest=card;}
+          }
+          if(nearest)startCardGrab(hand,nearest,q);
+        }
+        if(!pinching)cardGrab.delete(hand);
+        cardPinch.set(hand,pinching);
+      }
+    }
     // Two-Hand Pinch & Pull tracker
     const grabState = {
       h0Pinching: false,
@@ -1439,16 +1531,19 @@
       }
     }
 
-    // Grip Squeeze toggles Explode view
+    // Grip on a wall task card grabs it; otherwise keep the existing armour gesture.
     function onSqueezeStart(event) {
+      if(gripCardStart(event))return;
       playPositional(event.target === c0 ? grabAudio0 : grabAudio1, bufGrab);
       toggleExplode();
     }
+    function onSqueezeEnd(event){cardGrab.delete(event.target);}
 
     [c0, c1].forEach(c => {
       c.addEventListener('selectstart', onSelectStart);
       c.addEventListener('selectend', onSelectEnd);
       c.addEventListener('squeezestart', onSqueezeStart);
+      c.addEventListener('squeezeend', onSqueezeEnd);
     });
 
     // -------------------------------------------------------------
@@ -1522,13 +1617,13 @@
           if (forward.lengthSq() < .001) forward.set(0,0,-1);
           forward.normalize();
           const right = new THREE.Vector3(-forward.z,0,forward.x);
-          cameraRig.position.addScaledVector(forward,-y * 2.2 * delta);
-          cameraRig.position.addScaledVector(right,x * 2.2 * delta);
+          cameraRig.position.addScaledVector(forward,-y * 4.0 * delta);
+          cameraRig.position.addScaledVector(right,x * 4.0 * delta);
         }
 
         // Right thumbstick rotates VIEW, not the workshop model.
         if (source.handedness === 'right' && Math.abs(x) > 0.18) {
-          cameraRig.rotation.y -= x * 1.7 * delta;
+          cameraRig.rotation.y -= x * 2.0 * delta;
         }
         // X/Y on left Quest controller toggles the library.
         if (source.handedness === 'left') {
@@ -1548,6 +1643,7 @@
       const time = timestamp * 0.001;
 
       handleInput(delta, xrFrame);
+      if(renderer.xr.isPresenting){updateHandCardPinches();updateCardGrabs();}
       if (menuVisible && renderer.xr.isPresenting && !menuPositioned) { positionMenuInFront(); menuPositioned=true; }
 
       // Faceplate & explode actuation (segmented fallback hologram only —
