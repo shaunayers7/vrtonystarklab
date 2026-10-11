@@ -1270,7 +1270,7 @@
       facing.normalize();
       menuGroup.position.copy(eye).addScaledVector(facing,1.45);
       menuGroup.position.y=eye.y-.02;
-      menuGroup.rotation.set(0,Math.atan2(facing.x,facing.z),0);
+      menuGroup.rotation.set(0,Math.atan2(facing.x,facing.z)+Math.PI,0);
     }
     function resetWorkbenchModel(){
       // Home transform for the active center model, regardless of its current pose.
